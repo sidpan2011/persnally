@@ -136,7 +136,7 @@ Return as JSON:
 CONTENT_GENERATION_PROMPT = """
 You're a tech curator sending a friend 5 cool things that happened this week in tech.
 
-**CRITICAL TODAY'S DATE: September 30, 2025** - Only include content from the last 7-14 days (September 16-30, 2025)
+**CRITICAL TODAY'S DATE: {todays_date}** - Only include content from the last 3 days
 
 ═══════════════════════════════════════════════════════════════════
 PRIMARY MATCHING FACTOR (Weight: 70%) - USER INTERESTS:
@@ -163,7 +163,7 @@ AVAILABLE CONTENT (fresh sources - ALL HAVE URLS):
 - User starred repos: {starred_repos}
 
 YOUR MISSION:
-Find 5 interesting tech things from THIS WEEK (Sept 16-30, 2025) that match their STATED INTERESTS.
+Find 5 interesting tech things from the LAST 3 DAYS that match their STATED INTERESTS.
 Think: "What would excite someone who explicitly said they like {user_interests}?"
 
 MATCHING PRIORITY:
@@ -192,13 +192,14 @@ Example: "**Devpost AI Challenge** - Build AI apps for **$50K in prizes**. Deadl
 
 RULES:
 ✅ DO:
-- Focus on what's NEW (last 7-14 days ONLY - September 16-30, 2025)
+- Focus on what's NEW (last 3 days ONLY from {todays_date})
 - Use their tech stack to judge relevance, not dictate topics
 - Write naturally: "Anthropic dropped Claude 4.5 yesterday"
 - **CRITICAL: Include the ACTUAL URL from source data as a markdown link in the content**
 - **CRITICAL: Use the EXACT source name from the data (e.g., 'TechCrunch', 'The Verge', 'Google News', not just 'news')**
 - Add specific dates/numbers from source data
 - Make each item from DIFFERENT sources (don't use GitHub 5 times)
+- TOPIC DIVERSITY: Each item must cover a DIFFERENT topic/angle. Never have 3+ items about the same event or theme. If user has 5 interests, try to cover at least 3 different ones.
 - Only state facts you can verify from source data
 - If unsure about a detail (like model hierarchy), DON'T include it
 
@@ -208,7 +209,7 @@ RULES:
 - Use vague phrases: "could be useful", "great opportunity"
 - Fabricate URLs or events not in source data
 - Make claims about product positioning without verification (e.g., "sits between X and Y models")
-- Include content older than September 16, 2025
+- Include content older than 3 days from {todays_date}
 - Recommend financial trading/gambling tools
 - Repeat content from previous runs
 
@@ -250,7 +251,7 @@ OUTPUT FORMAT:
 
 **VERIFY BEFORE INCLUDING:**
 - URL exists in source data
-- Date is within Sept 16-30, 2025
+- Date is within last 3 days from {todays_date}
 - Facts are stated accurately (don't guess model hierarchies, positioning, etc)
 - If location is India, tried to find at least 1 India item
 

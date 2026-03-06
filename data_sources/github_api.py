@@ -136,9 +136,9 @@ class GitHubAPIClient:
                 import base64
                 content = base64.b64decode(readme_data["content"]).decode("utf-8")
                 return content[:2000]  # Limit size
-        except:
-            pass
-        
+        except Exception as e:
+            print(f"  ⚠️ Failed to fetch README for {username}: {e}")
+
         return ""
     
     def _get_active_repositories(self, repos: List[Dict]) -> List[Dict]:
