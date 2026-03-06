@@ -3,6 +3,7 @@ AI Editorial Engine - Behavioral Intelligence "Daily 5"
 Generates intelligent Daily 5 recommendations using behavioral analysis
 """
 import anthropic
+import asyncio
 import json
 from datetime import datetime
 from typing import Dict, Any, List
@@ -34,29 +35,21 @@ class AIEditorialEngine:
         for attempt in range(max_attempts):
             print(f"\n🎯 Generation Attempt {attempt + 1}/{max_attempts}")
             
-            # Step 1: Behavioral analysis
-            print("📊 Analyzing GitHub behavior...")
+            # Step 1: Behavioral analysis + repo files + web opportunities (PARALLEL)
+            print("📊 Analyzing GitHub behavior + repos + opportunities in parallel...")
             behavioral_data = await self.behavior_analyzer.analyze_user_behavior(research_data, user_profile)
-            
-            # Check if we have active repos
+
             active_repo_count = len(behavioral_data.get('evidence', {}).get('active_repos', []))
-            print(f"✅ Found {active_repo_count} active repos for content generation")
-
-            if active_repo_count == 0:
-                print("⚠️ WARNING: No active repos found in GitHub data")
-            else:
-                print(f"🎯 Using {active_repo_count} active repos for content generation")
-
-            # Step 1.5: Extract file-level details from repos
-            print("🔍 Extracting file-level details from repos...")
             active_repos = behavioral_data.get('evidence', {}).get('active_repos', [])
             github_username = user_profile.get('github_username', '')
-            repo_files_data = await self._analyze_repo_files(github_username, active_repos[:3])  # Analyze top 3 repos
-            print(f"📄 File analysis: {repo_files_data.get('summary', 'None')[:100]}")
+            print(f"✅ Found {active_repo_count} active repos")
 
-            # Step 1.6: Search web for current opportunities
-            print("🌐 Searching web for current opportunities...")
-            web_opportunities = await self.web_finder.find_opportunities(user_profile, behavioral_data)
+            # Run repo analysis and opportunity search in parallel
+            repo_files_data, web_opportunities = await asyncio.gather(
+                self._analyze_repo_files(github_username, active_repos[:3]),
+                self.web_finder.find_opportunities(user_profile, behavioral_data),
+            )
+            print(f"📄 File analysis: {repo_files_data.get('summary', 'None')[:100]}")
             print(f"🔎 Generated {len(web_opportunities.get('search_queries', []))} search queries")
 
             # Step 2: Generate content (NO FALLBACK until attempt 3)
@@ -70,16 +63,18 @@ class AIEditorialEngine:
                 web_opportunities
             )
             
-            # Step 3: VALIDATION (DISABLED FOR NOW - too strict)
+            # Step 3: Content validation
             print("🔍 Validating content quality...")
-
-            # HACKATHON MODE: Accept all content, just check basics
-            validation_result = {
-                'valid': True,
-                'errors': [],
-                'warnings': [],
-                'stats': {'avg_confidence_score': 75}
-            }
+            try:
+                validation_result = validator.validate_daily_5(daily_5_content, user_profile)
+            except Exception as val_err:
+                print(f"⚠️ Validation error (accepting content): {val_err}")
+                validation_result = {
+                    'valid': True,
+                    'errors': [],
+                    'warnings': [str(val_err)],
+                    'stats': {'avg_confidence_score': 60}
+                }
 
             # Track best attempt
             error_count = len(validation_result.get('errors', []))
@@ -438,6 +433,7 @@ class AIEditorialEngine:
                 skill_level = "intermediate/advanced"
 
             prompt = CONTENT_GENERATION_PROMPT.format(
+                todays_date=datetime.now().strftime("%B %d, %Y"),
                 tech_stack=json.dumps(github_context['tech_stack']),
                 user_interests=json.dumps(user_interests),
                 skill_level=skill_level,
