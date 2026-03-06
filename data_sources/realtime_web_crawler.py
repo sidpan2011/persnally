@@ -108,15 +108,19 @@ class RealTimeWebCrawler:
 
         fresh_articles = self._filter_by_recency(relevant_articles, hours=72)  # Last 3 days
         print(f"  After recency filter (72h): {len(fresh_articles)} articles")
-        
+
+        # Enforce topic diversity: no more than 2 articles about the same topic
+        diverse_articles = self._enforce_topic_diversity(fresh_articles)
+        print(f"  After topic diversity: {len(diverse_articles)} articles")
+
         # Sort by relevance, recency, and diversity
         sorted_articles = sorted(
-            fresh_articles, 
+            diverse_articles,
             key=lambda x: (
-                x.get('relevance_score', 0), 
+                x.get('relevance_score', 0),
                 x.get('diversity_score', 0),
                 self._parse_date(x.get('published_at', ''))
-            ), 
+            ),
             reverse=True
         )
         
@@ -169,8 +173,8 @@ class RealTimeWebCrawler:
                     else:
                         pub_date = datetime.now()
 
-                    # Check if article is recent (last 7 days)
-                    if (datetime.now() - pub_date).days > 7:
+                    # Check if article is recent (last 3 days)
+                    if (datetime.now() - pub_date).days > 3:
                         continue
 
                     article = {
@@ -206,8 +210,8 @@ class RealTimeWebCrawler:
                 for entry in feed.entries[:15]:  # Increased from 10 to 15
                     published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.now()
                     
-                    # Only include recent articles (last 5 days)
-                    if (datetime.now() - published).days <= 5:
+                    # Only include recent articles (last 3 days)
+                    if (datetime.now() - published).days <= 3:
                         articles.append({
                             'title': entry.title,
                             'description': self._clean_html(entry.get('summary', '')),
@@ -442,9 +446,8 @@ class RealTimeWebCrawler:
                     try:
                         published = datetime.fromisoformat(article['published_at'].replace('Z', '+00:00'))
 
-                        # Expanded to last 7 days for more results
                         days_old = (datetime.now(published.tzinfo) - published).days
-                        if days_old <= 7:
+                        if days_old <= 3:
                             articles.append({
                                 'title': article['title'],
                                 'description': article.get('description', article['title'])[:300],
@@ -646,22 +649,73 @@ class RealTimeWebCrawler:
         return core_sources + interest_based_sources + random_sources
     
     def _deduplicate_articles(self, articles: List[Dict]) -> List[Dict]:
-        """Remove duplicate articles based on title similarity"""
-        
-        seen_hashes = set()
+        """Remove duplicate articles based on title and URL similarity"""
+
+        seen_title_hashes = set()
+        seen_url_slugs = set()
         deduplicated = []
-        
+
         for article in articles:
             title = article.get('title', '')
-            # Create a hash of the title (normalized)
+            url = article.get('url', '')
+
+            # Title-based dedup
             title_normalized = re.sub(r'[^\w\s]', '', title.lower()).strip()
             title_hash = hashlib.md5(title_normalized.encode()).hexdigest()
-            
-            if title_hash not in seen_hashes:
-                seen_hashes.add(title_hash)
-                deduplicated.append(article)
-        
+
+            # URL-based dedup (same article, different headline)
+            parsed = urlparse(url)
+            url_slug = f"{parsed.netloc}{parsed.path}".rstrip('/')
+
+            if title_hash in seen_title_hashes or (url_slug and url_slug in seen_url_slugs):
+                continue
+
+            seen_title_hashes.add(title_hash)
+            if url_slug:
+                seen_url_slugs.add(url_slug)
+            deduplicated.append(article)
+
         return deduplicated
+
+    def _enforce_topic_diversity(self, articles: List[Dict]) -> List[Dict]:
+        """Ensure no single topic dominates. Max 2 articles per topic cluster."""
+        topic_keywords = {}
+        diverse = []
+
+        for article in articles:
+            text = f"{article.get('title', '')} {article.get('description', '')}".lower()
+            # Extract dominant topic from keywords
+            topic = self._classify_topic(text)
+            count = topic_keywords.get(topic, 0)
+
+            if count < 2:
+                topic_keywords[topic] = count + 1
+                diverse.append(article)
+
+        return diverse
+
+    def _classify_topic(self, text: str) -> str:
+        """Simple keyword-based topic classification."""
+        topic_map = {
+            'ai_ml': ['ai', 'machine learning', 'llm', 'gpt', 'claude', 'openai', 'anthropic', 'deep learning', 'neural'],
+            'web_dev': ['react', 'nextjs', 'vue', 'angular', 'frontend', 'css', 'javascript', 'typescript', 'web dev'],
+            'blockchain': ['blockchain', 'crypto', 'ethereum', 'web3', 'defi', 'nft', 'solana'],
+            'devops': ['kubernetes', 'docker', 'aws', 'cloud', 'devops', 'ci/cd', 'terraform'],
+            'mobile': ['ios', 'android', 'swift', 'kotlin', 'flutter', 'react native', 'mobile'],
+            'security': ['security', 'vulnerability', 'hack', 'breach', 'privacy', 'encryption'],
+            'startup': ['startup', 'funding', 'series', 'vc', 'yc', 'launch', 'raise'],
+            'open_source': ['open source', 'github', 'repository', 'contributor', 'stars'],
+        }
+
+        scores = {}
+        for topic, keywords in topic_map.items():
+            score = sum(1 for kw in keywords if kw in text)
+            if score > 0:
+                scores[topic] = score
+
+        if scores:
+            return max(scores, key=scores.get)
+        return 'general'
     
     def _filter_by_interests_enhanced(self, articles: List[Dict], user_interests: List[str]) -> List[Dict]:
         """Enhanced interest filtering with better matching and diversity scoring"""
@@ -724,9 +778,8 @@ class RealTimeWebCrawler:
                         try:
                             created_time = datetime.fromtimestamp(post_data.get('created_utc', 0))
 
-                            # Expanded to last 7 days
                             days_old = (datetime.now() - created_time).days
-                            if days_old <= 7:
+                            if days_old <= 3:
                                 articles.append({
                                     'title': post_data['title'],
                                     'description': f"Reddit discussion with {post_data.get('num_comments', 0)} comments and {post_data.get('score', 0)} upvotes",
@@ -791,7 +844,7 @@ class RealTimeWebCrawler:
                         created_at = datetime.fromisoformat(node.get('createdAt', '').replace('Z', '+00:00'))
                         days_old = (datetime.now(created_at.tzinfo) - created_at).days
 
-                        if days_old <= 7:
+                        if days_old <= 3:
                             articles.append({
                                 'title': node.get('name', ''),
                                 'description': node.get('tagline', ''),
