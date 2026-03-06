@@ -3,10 +3,13 @@ Email Sender - Premium Editorial Email Delivery
 """
 from jinja2 import Template, Environment, FileSystemLoader
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Any
 from .image_fetcher import ImageFetcher
 from .content_formatter import ContentFormatter
 import re
+
+TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 class PremiumEmailSender:
     def __init__(self, config, mcp_orchestrator):
@@ -84,7 +87,7 @@ class PremiumEmailSender:
     def _generate_daily_5_email_html(self, user_data: dict, daily_5_content: Dict[str, Any]) -> str:
         """Generate Daily 5 HTML email with visual formatting"""
 
-        with open('templates/email.html', 'r') as f:
+        with open(TEMPLATE_DIR / 'email.html', 'r') as f:
             template_content = f.read()
 
         # Format items with visual highlighting
@@ -135,9 +138,9 @@ class PremiumEmailSender:
     def _generate_premium_email_html(self, user_data: dict, editorial_content: Dict[str, str]) -> str:
         """Generate premium HTML email (legacy method)"""
         
-        with open('templates/email.html', 'r') as f:
+        with open(TEMPLATE_DIR / 'email.html', 'r') as f:
             template_content = f.read()
-        
+
         template = Template(template_content)
         
         return template.render(
