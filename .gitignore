@@ -124,3 +124,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Node.js (web app)
+web/node_modules/
+web/.next/
+web/.env.local
