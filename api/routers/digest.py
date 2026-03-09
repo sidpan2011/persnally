@@ -264,13 +264,7 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
     )
 
     # Preferences
-    prefs = (
-        client.table("user_preferences")
-        .select("send_frequency")
-        .eq("user_id", user["id"])
-        .maybe_single()
-        .execute()
-    )
+    prefs = client.table("user_preferences").select("send_frequency").eq("user_id", user["id"]).maybe_single().execute()
 
     graph = snapshot.data.get("interest_graph", {}) if snapshot and snapshot.data else {}
     topics = graph.get("topics", [])
@@ -282,9 +276,7 @@ async def get_dashboard_stats(user: dict = Depends(get_current_user)):
     total_signals = snapshot.data.get("total_signals", 0) if snapshot and snapshot.data else 0
     total_digests = len(newsletter_list)
     avg_quality = (
-        round(sum(n.get("quality_score", 0) for n in newsletter_list) / len(newsletter_list))
-        if newsletter_list
-        else 0
+        round(sum(n.get("quality_score", 0) for n in newsletter_list) / len(newsletter_list)) if newsletter_list else 0
     )
     last_synced = snapshot.data.get("synced_at") if snapshot and snapshot.data else None
     last_digest = newsletter_list[0].get("sent_at") if newsletter_list else None
