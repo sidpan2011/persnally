@@ -1,245 +1,247 @@
-# Persnally - Personalized Tech Intelligence
+# Persnally
 
-> **Hackathon Project**: Built in 48 hours for the Resend MCP Hackathon. Core functionality works - it analyzes GitHub activity, curates fresh tech content, and delivers via email. Some features are still being refined (see Current Status below).
+**Your AI conversations already know what you care about. Persnally turns that into a personalized daily digest.**
 
-An AI-powered system that analyzes your GitHub activity and stated interests to deliver relevant tech intelligence via email.
+An open-source MCP server that plugs into Claude, ChatGPT, or any MCP-compatible client. It passively learns your interests from natural conversation — no forms, no onboarding, no manual tagging — and delivers curated content straight to your inbox via Resend.
 
-## What It Does
+## The Insight
 
-**Persnally** generates personalized tech briefings by combining your interests with real-time content discovery:
+Every day you chat with AI about the things that matter to you — the framework you're debugging, the startup idea you're exploring, the investment thesis you're researching. That context is incredibly valuable, but it disappears when you close the tab.
 
-- Analyzes your GitHub for technical context (skill level, tech stack)
-- Gathers fresh content from GitHub trending, HackerNews, and news sources
-- Uses Claude Sonnet 4 to match content to your interests
-- Validates quality (real URLs, specific dates, no generic spam)
-- Sends via Resend MCP integration
+Persnally captures structured signals from those conversations (never raw messages) and builds an evolving interest graph that gets smarter over time. Then it curates a daily digest of content matched to what you *actually* care about right now — not what you said you liked 6 months ago on a settings page.
+
+## How It Works
+
+```
+You chat with Claude/ChatGPT as normal
+        ↓
+AI calls persnally_track with structured topic signals
+        ↓
+Local interest graph builds (decays, learns, balances)
+        ↓
+You trigger persnally_digest (or it runs on schedule)
+        ↓
+API curates fresh content matched to your interests
+        ↓
+Personalized digest arrives via Resend
+```
+
+**Zero onboarding.** The AI chat IS the preference engine.
 
 ## Quick Start
 
-### 1. Set Up Your Profile
+### 1. Install the MCP Server
 
-Create `user_profile.json`:
+```bash
+npm install -g persnally-mcp
+```
+
+### 2. Add to Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
-  "name": "Your Name",
-  "email": "your-email@example.com",
-  "github_username": "your-github-username",
-  "location": "USA",
-  "interests": ["ai/ml tools", "hackathons", "product development"],
-  "experience_level": "intermediate_to_advanced",
-  "preferences": {
-    "content_style": "technical_with_business_context",
-    "prioritize_local": true,
-    "opportunity_types": ["hackathons", "jobs", "events"]
+  "mcpServers": {
+    "persnally": {
+      "command": "persnally-mcp"
+    }
   }
 }
 ```
 
-### 2. Configure API Keys
+### 3. Chat Naturally
 
-Copy `env_template.txt` to `.env`:
+Just talk to Claude. Persnally tracks topics in the background. When you're ready:
 
-```bash
-cp env_template.txt .env
+> "Set my Persnally email to alice@example.com"
+
+> "Show me my Persnally interests"
+
+> "Send me my digest"
+
+That's it. No signup, no configuration wizard, no preference forms.
+
+## MCP Tools
+
+| Tool | What It Does |
+|------|-------------|
+| `persnally_track` | Extracts structured topic signals from conversation (called automatically by AI) |
+| `persnally_interests` | Shows your current interest profile with weights, categories, and sentiment |
+| `persnally_digest` | Generates and sends a personalized digest based on your interest graph |
+| `persnally_config` | Configure email, digest frequency, API key |
+| `persnally_forget` | Remove specific topics or clear all data (privacy control) |
+
+## Interest Engine
+
+The engine is designed to mirror how human interests actually work:
+
+- **Exponential decay** (7-day half-life) — last week's Kubernetes deep-dive shouldn't dominate forever
+- **Depth over frequency** — a 2-hour conversation about Rust outweighs 10 one-liner mentions
+- **Sentiment awareness** — "I hate CSS" deprioritizes CSS in your digest, doesn't boost it
+- **Balanced allocation** — if you're 60% tech, 30% business, 10% finance, your digest reflects that exact ratio
+- **Intent classification** — learning vs building vs researching vs debugging produces different content
+- **Entity extraction** — tracks specific tools, companies, and concepts, not just vague categories
+
+## Privacy by Architecture
+
+This isn't "we promise we don't read your messages." This is **structurally impossible** for raw conversations to leak:
+
+- Only structured signals are stored: `{ topic, weight, category, intent, sentiment, entities }`
+- Raw messages never touch disk, never leave your machine, never hit any API
+- Interest graph lives locally at `~/.persnally/`
+- Cloud sync is opt-in and only sends the structured graph
+- Fully open source — verify it yourself
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Your AI Client (Claude Desktop / ChatGPT / etc.)       │
+│                                                         │
+│  You chat naturally. AI calls persnally_track when it   │
+│  notices topics you care about. Zero extra AI cost —    │
+│  Claude IS the NLP engine.                              │
+└──────────────────────┬──────────────────────────────────┘
+                       │ MCP Protocol (stdio)
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│  Persnally MCP Server (runs locally)                    │
+│                                                         │
+│  Interest Engine:                                       │
+│  - Signal processing (weight × depth × sentiment)       │
+│  - Exponential decay (half-life: 7 days)                │
+│  - Category balancing (proportional allocation)         │
+│  - Local persistence (~/.persnally/)                    │
+└──────────────────────┬──────────────────────────────────┘
+                       │ HTTPS (opt-in)
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│  Persnally API (FastAPI on Railway)                     │
+│                                                         │
+│  - Receives interest graph                              │
+│  - Multi-source research (GitHub, HN, news)             │
+│  - AI curation (Claude Sonnet 4)                        │
+│  - Quality validation (URL check, freshness, dedup)     │
+│  - Email delivery via Resend                            │
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────┐
+│  Web Dashboard (Next.js on Vercel)                      │
+│                                                         │
+│  - Skill DNA analysis (GitHub framework detection)      │
+│  - Interest profile visualization                       │
+│  - Digest history and preferences                       │
+│  - GitHub OAuth (Supabase Auth)                         │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Required:
-- **ANTHROPIC_API_KEY** - Get from [console.anthropic.com](https://console.anthropic.com)
-- **RESEND_API_KEY** - Get from [resend.com](https://resend.com)
+## Skill DNA
 
-Optional:
-- **GITHUB_TOKEN** - Get from [github.com/settings/tokens](https://github.com/settings/tokens)
+Connect your GitHub and Persnally analyzes your actual code — not just stars or followers:
 
-### 3. Install & Run
+- **Framework detection** from dependency files (package.json, requirements.txt, Cargo.toml, go.mod)
+- **Proficiency scoring** based on repo activity, recency, and code volume
+- **Domain classification** across 10 categories (frontend, backend, AI/ML, DevOps, etc.)
+- **Skill gap analysis** from starred repos and adjacent technologies
+- **AI synthesis** via Claude for career narrative and growth areas
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+## Content Curation Pipeline
 
-# Generate and send newsletter
-python run.py
+When you trigger a digest, the API runs a multi-stage pipeline:
 
-# Test without sending
-python test_daily_5.py
-```
-
-## Current Status
-
-**What Works:**
-- GitHub activity analysis for technical context
-- Multi-source content aggregation (GitHub trending, HackerNews, tech news)
-- AI-powered content generation with Claude Sonnet 4
-- Quality validation (URL verification, date checking, spam prevention)
-- Email delivery via Resend MCP with professional templates
-- Content diversity mechanisms (randomized source selection)
-
-**Active Development:**
-- Geographic content coverage (limited non-US sources currently)
-- User profiling accuracy (balancing stated interests vs GitHub activity)
-- Source reliability (some sources return limited results)
-- Content diversity (randomized source selection per run)
-
-**Known Limitations:**
-- May generate 3-4 items instead of 5 if quality standards aren't met
-- Geographic personalization works best for US content
-- Some web crawling sources (Dev.to, Product Hunt) have limited results
-- Content may repeat if run multiple times on same day (sources update daily)
-
-This is a working proof of concept demonstrating personalized tech intelligence. Quality over quantity - better to send 4 verified items than 5 items with spam.
-
-## How It Works
-
-1. **Profile Analysis**: Reads your interests and analyzes GitHub for technical context
-2. **Content Discovery**: Gathers fresh content (last 7-14 days) from multiple sources
-3. **AI Curation**: Claude Sonnet 4 matches content to your profile
-4. **Quality Validation**: Checks URLs, dates, specificity, and relevance
-5. **Email Delivery**: Sends via Resend MCP with clean HTML template
-
-The system uses your GitHub to understand skill level and tech stack, but recommends based on your stated interests. It's smart filtering, not surveillance.
-
-## Features
-
-### Data Sources
-
-**Currently Working:**
-- GitHub API (trending repos, releases, user activity)
-- HackerNews API (top stories, discussions)
-- Tech news sites (TechCrunch, The Verge, Wired via web scraping)
-- Opportunity aggregation (hackathons, jobs from multiple sources)
-
-**Partial Results:**
-- Dev.to (limited article matches)
-- Reddit (limited discussion matches)
-- Product Hunt (limited product matches)
-
-### Content Validation
-
-- Real URL verification (broken links rejected)
-- Specific date requirements (no vague "recently" or "this month")
-- Spam phrase detection (rejects generic marketing language)
-- Source diversity (each item from different source when possible)
-- Freshness filtering (content from last 7-14 days)
-
-### Email Features
-
-- Clean, scannable HTML template
-- Mobile-responsive design
-- Source attribution
-- Clickable real URLs
-- Custom branding with Bebas Neue font
+1. **Interest graph analysis** — weighted, decayed, sentiment-adjusted topic extraction
+2. **Multi-source research** — GitHub trending, HackerNews, tech news, opportunities
+3. **AI matching** — Claude Sonnet 4 matches content to your specific interest signals
+4. **Quality validation** — real URL verification, date freshness, spam detection, dedup
+5. **Balanced allocation** — content distributed proportionally across your interest categories
+6. **Email delivery** — clean, mobile-responsive HTML via Resend MCP
 
 ## Project Structure
 
 ```
 persnally/
-├── src/
-│   ├── ai_engine.py           # Content generation orchestrator
-│   ├── behavior_analyzer.py   # GitHub activity analysis
-│   ├── content_curator.py     # Content generation & curation
-│   ├── content_validator.py   # Quality validation
-│   ├── email_sender.py        # Email generation & sending
-│   └── config.py              # Configuration management
-├── data_sources/
-│   ├── github_api.py          # GitHub API client
-│   ├── hackernews_api.py      # HackerNews API client
-│   ├── opportunity_finder.py  # Hackathons + jobs aggregator
-│   ├── realtime_web_crawler.py # Multi-source web crawler
-│   └── web_research.py        # Research data aggregator
-├── mcp_server/resend/         # Resend MCP integration
-├── templates/
-│   └── email.html             # Email template
-├── user_profile.json          # User configuration
-└── run.py                     # Main entry point
+├── mcp_server/persnally/        # Open-source MCP server (npm package)
+│   └── src/
+│       ├── index.ts             # MCP tools (track, interests, digest, config, forget)
+│       ├── interest-engine.ts   # Interest graph with decay + balancing
+│       └── digest-client.ts     # API client for digest generation
+├── api/                         # FastAPI backend (Railway)
+│   ├── routers/
+│   │   ├── digest.py            # Digest generation from interest graph
+│   │   ├── skills.py            # Skill DNA analysis
+│   │   ├── newsletters.py       # Newsletter management
+│   │   └── ...
+│   └── services/
+│       ├── engine_bridge.py     # Curation engine integration
+│       └── career_bridge.py     # Skill analyzer integration
+├── src/                         # Core intelligence engine
+│   ├── ai_engine.py             # AI curation with Claude Sonnet 4
+│   ├── behavior_analyzer.py     # GitHub behavioral analysis
+│   ├── content_validator.py     # Quality validation
+│   ├── skill_analyzer.py        # Skill DNA framework detection
+│   └── email_sender.py          # Resend email delivery
+├── web/                         # Next.js frontend (Vercel)
+│   └── src/app/
+│       └── dashboard/
+│           ├── page.tsx          # Career intelligence overview
+│           └── skills/page.tsx   # Skill DNA visualization
+└── templates/                   # Email HTML templates
 ```
 
-## Technical Stack
+## Tech Stack
 
-- **AI Model**: Claude Sonnet 4 (Anthropic API)
-- **Email Delivery**: Resend MCP Server
-- **GitHub Integration**: GitHub REST API
-- **Web Scraping**: BeautifulSoup4 + httpx
-- **Async Processing**: Concurrent data fetching
+- **MCP Server**: TypeScript, `@modelcontextprotocol/sdk`, Zod
+- **API**: FastAPI, Python 3.11+
+- **Frontend**: Next.js 16, Tailwind CSS
+- **AI**: Claude Sonnet 4 (Anthropic API)
+- **Email**: Resend MCP
+- **Auth**: Supabase (GitHub OAuth)
+- **Database**: Supabase PostgreSQL with RLS
+- **Deploy**: Railway (API), Vercel (Web)
 
-## Configuration
-
-### User Profile Options
-
-```json
-{
-  "interests": ["topic1", "topic2"],  // Your actual interests (most important)
-  "experience_level": "beginner|intermediate|intermediate_to_advanced|expert",
-  "preferences": {
-    "content_style": "technical|technical_with_business_context|business_focused",
-    "prioritize_local": true,  // Prefer local content when available
-    "opportunity_types": ["hackathons", "jobs", "funding", "events"]
-  }
-}
-```
-
-### Environment Variables
+## Development
 
 ```bash
-# Required
-ANTHROPIC_API_KEY=your_anthropic_api_key
-RESEND_API_KEY=your_resend_api_key
+# MCP Server
+cd mcp_server/persnally
+npm install && npm run build
+npm start
 
-# Optional (prevents GitHub rate limiting)
-GITHUB_TOKEN=your_github_token
+# API
+cd api
+pip install -r requirements.txt
+uvicorn main:app --reload
+
+# Web
+cd web
+npm install && npm run dev
 ```
 
-## Testing
+## Environment Variables
 
+### API (.env)
 ```bash
-# Full system test (generates + sends email)
-python run.py
-
-# Test generation only (no email)
-python test_daily_5.py
+ANTHROPIC_API_KEY=       # Required — Claude API
+RESEND_API_KEY=          # Required — email delivery
+SUPABASE_URL=            # Required — database
+SUPABASE_ANON_KEY=       # Required — client auth
+SUPABASE_SERVICE_ROLE_KEY= # Required — server operations
+GITHUB_TOKEN=            # Optional — higher rate limits
+FRONTEND_URL=            # Production frontend URL
 ```
 
-## Troubleshooting
-
-**No relevant content found:**
-- Make your interests more specific in `user_profile.json`
-- Check that data sources are accessible (GitHub, HackerNews)
-- Review console logs for API errors
-
-**Email not received:**
-- Verify RESEND_API_KEY is valid
-- Check email address in user_profile.json
-- Review Resend dashboard for delivery status
-
-**Low geographic relevance:**
-- US content is most abundant in current sources
-- Geographic personalization being expanded
-
-## Development Roadmap
-
-**Immediate (Post-Hackathon):**
-- Expand non-US content sources (India, Europe, Asia)
-- Refine user profiling (better interest matching)
-- Add content tracking to prevent repetition
-
-**Future:**
-- User feedback loops (thumbs up/down on items)
-- Frequency controls (daily, weekly, activity-triggered)
-- More data sources (newsletter APIs, conference listings)
-- Analytics dashboard (engagement tracking)
+### MCP Server (environment or ~/.persnally/config.json)
+```bash
+PERSNALLY_API_URL=       # API endpoint (default: https://api.persnally.com)
+PERSNALLY_API_KEY=       # API key for digest generation
+```
 
 ## Built For
 
-Resend MCP Hackathon - October 2025
-
-**Key Technologies:**
-- Anthropic Claude API for AI-powered curation
-- Resend MCP for email delivery
-- Multiple real-time data sources (GitHub, HackerNews, news APIs)
+Resend MCP Hackathon — Built with Anthropic Claude API + Resend MCP for email delivery.
 
 ## License
 
-MIT License
-
----
-
-**Note**: This is a proof of concept demonstrating personalized tech intelligence. The core system works and sends quality content, but some features are still being refined based on real-world usage. Feedback welcome!
+MIT
