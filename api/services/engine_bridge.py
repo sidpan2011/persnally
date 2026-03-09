@@ -74,7 +74,7 @@ async def _run_pipeline_inner(
     """Core pipeline logic executed under the timeout wrapper."""
     # Import engine components (lazy to avoid import issues at module level)
     from src.config import Config
-    from src.mcp_orchestrator import MCPOrchestrator
+    from src.mcp_clients.resend_client import MCPResendClient
     from src.ai_engine import AIEditorialEngine
     from src.email_sender import PremiumEmailSender
     from src.system_prompts import LOCATION_RULES
@@ -84,11 +84,11 @@ async def _run_pipeline_inner(
     if github_token:
         config.GITHUB_TOKEN = github_token
 
-    mcp_orchestrator = MCPOrchestrator(config)
+    resend_client = MCPResendClient(config)
     ai_engine = AIEditorialEngine(config)
-    email_sender = PremiumEmailSender(config, mcp_orchestrator)
+    email_sender = PremiumEmailSender(config, resend_client)
 
-    await mcp_orchestrator.initialize_all_clients()
+    await resend_client.start_mcp_server()
 
     # Gather research if not provided
     if research_data is None:

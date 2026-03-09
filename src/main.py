@@ -7,7 +7,7 @@ import asyncio
 import json
 from pathlib import Path
 from src.config import get_config
-from src.mcp_orchestrator import MCPOrchestrator
+from src.mcp_clients.resend_client import MCPResendClient
 from src.ai_engine import AIEditorialEngine
 from src.email_sender import PremiumEmailSender
 from src.system_prompts import LOCATION_RULES
@@ -41,13 +41,13 @@ async def main():
     
     # Initialize components
     config = get_config()
-    mcp_orchestrator = MCPOrchestrator(config)
+    resend_client = MCPResendClient(config)
     ai_engine = AIEditorialEngine(config)
-    email_sender = PremiumEmailSender(config, mcp_orchestrator)
+    email_sender = PremiumEmailSender(config, resend_client)
     web_research = WebResearchAggregator(config.GITHUB_TOKEN)
-    
+
     # Initialize MCP services
-    await mcp_orchestrator.initialize_all_clients()
+    await resend_client.start_mcp_server()
     
     print(f"🔄 Generating Daily 5 for: {user_profile['name']}")
     print("=" * 50)

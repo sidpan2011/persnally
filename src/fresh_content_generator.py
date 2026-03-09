@@ -7,6 +7,8 @@ import asyncio
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from .config import get_config
+from .cache import cache_get, cache_set, cache_key
+from .topic_utils import expand_terms, relevance_score
 
 
 class FreshContentGenerator:
@@ -73,13 +75,19 @@ class FreshContentGenerator:
         sorted_topics = sorted(topics, key=lambda t: t.get("weight", 0), reverse=True)[:5]
         top_queries = [t["topic"] for t in sorted_topics]
 
-        print(f"Interest-graph mode: querying for top topics {top_queries}")
+        # Expand queries with synonyms for broader GitHub coverage
+        expanded_queries = expand_terms(top_queries)
+        # Keep original topics first, then add a few synonym-expanded terms (cap to avoid API spam)
+        extra_queries = [q for q in expanded_queries if q not in [t.lower() for t in top_queries]][:3]
+        all_queries = top_queries + extra_queries
+
+        print(f"Interest-graph mode: querying for top topics {top_queries} (+ {len(extra_queries)} synonym expansions)")
 
         interests = [i.lower() for i in user_profile.get("interests", [])]
 
         # Fetch HN stories once, then targeted GitHub searches per topic
         hn_coro = self._fetch_hn_top_stories(limit=50)
-        gh_trending_coros = [self._fetch_github_trending(interests, query=q) for q in top_queries]
+        gh_trending_coros = [self._fetch_github_trending(interests, query=q) for q in all_queries]
         gh_learning_coro = self._fetch_github_learning(interests)
         gh_opportunity_coro = self._fetch_github_opportunity(interests)
 
@@ -102,8 +110,8 @@ class FreshContentGenerator:
                     seen_ids.add(rid)
                     gh_trending_merged.append(repo)
 
-        # Filter HN stories to those matching any interest-graph topic keyword
-        topic_keywords = {kw.lower() for q in top_queries for kw in q.split()}
+        # Filter HN stories to those matching any interest-graph topic keyword (with synonym expansion)
+        topic_keywords = set(expand_terms([kw for q in top_queries for kw in q.split()]))
         filtered_hn = [
             s for s in hn_stories
             if any(kw in s.get("title", "").lower() for kw in topic_keywords)
@@ -126,6 +134,11 @@ class FreshContentGenerator:
 
     async def _fetch_hn_top_stories(self, limit: int = 30) -> List[Dict[str, Any]]:
         """Fetch top HackerNews stories with details."""
+        ck = cache_key("hn_top_stories", str(limit))
+        cached = cache_get(ck)
+        if cached is not None:
+            print("HackerNews: returning cached results")
+            return cached
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
@@ -149,6 +162,7 @@ class FreshContentGenerator:
                     data = r.json()
                     if data and data.get("title"):
                         stories.append(data)
+                cache_set(ck, stories)
                 return stories
         except Exception as e:
             print(f"HackerNews fetch failed: {e}")
@@ -199,6 +213,11 @@ class FreshContentGenerator:
         self, query: str, sort: str = "stars", limit: int = 10
     ) -> List[Dict[str, Any]]:
         """Run a GitHub search/repositories query."""
+        ck = cache_key("gh_search", query, sort, str(limit))
+        cached = cache_get(ck)
+        if cached is not None:
+            print(f"GitHub search: returning cached results for '{query}'")
+            return cached
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
@@ -212,7 +231,9 @@ class FreshContentGenerator:
                     headers=self._github_headers,
                 )
                 resp.raise_for_status()
-                return resp.json().get("items", [])
+                items = resp.json().get("items", [])
+                cache_set(ck, items)
+                return items
         except Exception as e:
             print(f"GitHub search failed for '{query}': {e}")
             return []
@@ -221,9 +242,11 @@ class FreshContentGenerator:
 
     @staticmethod
     def _relevance_score(text: str, interests: List[str]) -> int:
-        """Simple keyword-overlap relevance score."""
-        text_lower = text.lower()
-        return sum(1 for interest in interests if interest in text_lower)
+        """Relevance score using synonym expansion.
+
+        Direct keyword match = 2 points, synonym match = 1 point.
+        """
+        return relevance_score(text, interests)
 
     def _best_hn_match(
         self, stories: List[Dict[str, Any]], interests: List[str], exclude_ids: set = None

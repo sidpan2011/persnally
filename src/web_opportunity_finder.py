@@ -9,6 +9,8 @@ from datetime import datetime
 import json
 
 from .config import get_config
+from .cache import cache_get, cache_set, cache_key
+from .topic_utils import expand_terms
 
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
@@ -38,8 +40,12 @@ class WebOpportunityFinder:
 
         print(f"[WebFinder] Searching GitHub with {len(interests)} interests, {len(skills)} skills")
 
-        # Derive search terms from both interests and skills
-        search_terms = list(set(interests[:3] + skills[:3]))
+        # Derive search terms from both interests and skills, expanded with synonyms
+        base_terms = list(set(interests[:3] + skills[:3]))
+        expanded = expand_terms(base_terms)
+        # Use original terms plus up to 3 synonym expansions to broaden search
+        extra = [t for t in expanded if t not in [b.lower() for b in base_terms]][:3]
+        search_terms = base_terms + extra
         current_year = datetime.now().year
 
         # Run all searches in parallel
@@ -156,20 +162,34 @@ class WebOpportunityFinder:
 
     async def _github_repo_search(self, client: httpx.AsyncClient, q: str, sort: str = "updated", per_page: int = 5) -> List[Dict]:
         """Execute a GitHub repository search. Returns list of repo items."""
+        ck = cache_key("wf_repo_search", q, sort, str(per_page))
+        cached = cache_get(ck)
+        if cached is not None:
+            print(f"[WebFinder] Returning cached repo search for '{q}'")
+            return cached
         try:
             resp = await client.get(GITHUB_SEARCH_URL, params={"q": q, "sort": sort, "per_page": per_page})
             resp.raise_for_status()
-            return resp.json().get("items", [])
+            items = resp.json().get("items", [])
+            cache_set(ck, items)
+            return items
         except (httpx.HTTPStatusError, httpx.RequestError, json.JSONDecodeError) as e:
             print(f"[WebFinder] GitHub repo search failed for '{q}': {e}")
             return []
 
     async def _github_issue_search(self, client: httpx.AsyncClient, q: str, sort: str = "created", per_page: int = 5) -> List[Dict]:
         """Execute a GitHub issue search. Returns list of issue items."""
+        ck = cache_key("wf_issue_search", q, sort, str(per_page))
+        cached = cache_get(ck)
+        if cached is not None:
+            print(f"[WebFinder] Returning cached issue search for '{q}'")
+            return cached
         try:
             resp = await client.get(GITHUB_ISSUES_URL, params={"q": q, "sort": sort, "per_page": per_page})
             resp.raise_for_status()
-            return resp.json().get("items", [])
+            items = resp.json().get("items", [])
+            cache_set(ck, items)
+            return items
         except (httpx.HTTPStatusError, httpx.RequestError, json.JSONDecodeError) as e:
             print(f"[WebFinder] GitHub issue search failed for '{q}': {e}")
             return []
