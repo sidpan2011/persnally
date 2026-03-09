@@ -193,15 +193,24 @@ class AIEditorialEngine:
             skills=user_profile.get('skills', [])
         )
         
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
+        response = self.client.messages.create(
+            model="claude-sonnet-4-20250514",
             max_tokens=1200,
             temperature=0.3,
+            system="You are a behavioral analysis engine. Analyze GitHub activity and return structured JSON.",
             messages=[{"role": "user", "content": prompt}]
         )
-        
+
         try:
-            behavioral_data = json.loads(response.choices[0].message.content)
+            raw_text = response.content[0].text.strip()
+            # Strip markdown JSON wrapper if present
+            if raw_text.startswith('```json'):
+                raw_text = raw_text[7:]
+            if raw_text.startswith('```'):
+                raw_text = raw_text[3:]
+            if raw_text.endswith('```'):
+                raw_text = raw_text[:-3]
+            behavioral_data = json.loads(raw_text.strip())
             
             # Ensure compatibility with content curator expected format
             if 'evidence' in behavioral_data:
@@ -450,26 +459,16 @@ class AIEditorialEngine:
             traceback.print_exc()
             raise
         
-        # CRITICAL: Higher temperature for creativity and variety
-        # Adding randomization to prevent same content every time
-        import random
-        import time
-        # Seed random with current time for true variety across runs
-        random.seed(int(time.time()))
-        temperature = random.uniform(0.7, 0.9)  # Random temperature for variety
-        
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=4000,
-            temperature=temperature,  # Higher for creativity and variety
+            temperature=0.5,
             system="You are a creative tech recommendation engine. Generate EXACTLY 5 DIVERSE items with VARIETY. Each 100-200 words. Be creative, explore different angles, avoid repetition. Focus on being helpful, not critical. Return valid JSON with 5 items.",
             messages=[
                 {"role": "user", "content": prompt}
             ]
         )
         
-        print(f"  🎲 Using temperature: {temperature:.2f} for creative variety")
-
         try:
             content_text = response.content[0].text.strip()
             print(f"🔍 AI Response type: {type(content_text)}")

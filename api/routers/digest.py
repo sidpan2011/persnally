@@ -11,7 +11,6 @@ and triggers the full pipeline: research → AI curation → validation → Rese
 """
 
 import hashlib
-import traceback
 from datetime import datetime
 from typing import Optional
 
@@ -19,6 +18,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header, 
 from pydantic import BaseModel
 
 from services.supabase_client import get_service_client
+from services.engine_bridge import run_generation_pipeline
 
 router = APIRouter(prefix="/digest", tags=["digest"])
 
@@ -221,104 +221,39 @@ async def run_interest_digest(
     """
     client = get_service_client()
 
+    # Convert interest graph → user profile for the curation engine
+    user_profile = _interest_graph_to_profile(email, interest_graph, balanced_allocation)
+
+    # Fetch GitHub token if user has one connected
+    github_token = None
     try:
-        client.table("generation_jobs").update({
-            "status": "running",
-            "started_at": datetime.utcnow().isoformat(),
-        }).eq("id", job_id).execute()
+        account = (
+            client.table("connected_accounts")
+            .select("access_token, username")
+            .eq("user_id", user_id)
+            .eq("provider", "github")
+            .maybe_single()
+            .execute()
+        )
+        if account and account.data:
+            github_token = account.data["access_token"]
+            user_profile["github_username"] = account.data["username"]
+    except Exception:
+        pass
 
-        # Convert interest graph → user profile for the curation engine
-        user_profile = _interest_graph_to_profile(email, interest_graph, balanced_allocation)
+    # Build research data from interest graph topics
+    # Instead of web_research.gather_comprehensive_research (which needs GitHub activity),
+    # we construct research context directly from the interest graph
+    research_data = _build_research_from_interests(interest_graph, balanced_allocation)
 
-        # Fetch GitHub token if user has one connected
-        github_token = None
-        try:
-            account = (
-                client.table("connected_accounts")
-                .select("access_token, username")
-                .eq("user_id", user_id)
-                .eq("provider", "github")
-                .maybe_single()
-                .execute()
-            )
-            if account and account.data:
-                github_token = account.data["access_token"]
-                user_profile["github_username"] = account.data["username"]
-        except Exception:
-            pass
-
-        # Import engine components
-        from src.config import Config
-        from src.mcp_orchestrator import MCPOrchestrator
-        from src.ai_engine import AIEditorialEngine
-        from src.email_sender import PremiumEmailSender
-
-        config = Config()
-        if github_token:
-            config.GITHUB_TOKEN = github_token
-
-        mcp_orchestrator = MCPOrchestrator(config)
-        ai_engine = AIEditorialEngine(config)
-        email_sender = PremiumEmailSender(config, mcp_orchestrator)
-
-        await mcp_orchestrator.initialize_all_clients()
-
-        # Build research data from interest graph topics
-        # Instead of web_research.gather_comprehensive_research (which needs GitHub activity),
-        # we construct research context directly from the interest graph
-        research_data = _build_research_from_interests(interest_graph, balanced_allocation)
-
-        # Generate content using the AI engine
-        daily_5_content = await ai_engine.generate_daily_5(user_profile, research_data)
-
-        # Render and send email
-        html_content = email_sender._generate_daily_5_email_html(user_profile, daily_5_content)
-        success = await email_sender.send_daily_5_newsletter(user_profile, daily_5_content)
-
-        # Store newsletter
-        newsletter = client.table("newsletters").insert({
-            "user_id": user_id,
-            "subject": daily_5_content.get("subject_line", "Your Persnally Digest"),
-            "headline": daily_5_content.get("headline", ""),
-            "items": daily_5_content.get("items", []),
-            "full_content": daily_5_content,
-            "html_snapshot": html_content,
-            "status": "sent" if success else "failed",
-            "source": "mcp_interest_graph",
-        }).execute()
-
-        newsletter_id = newsletter.data[0]["id"] if newsletter.data else None
-
-        # Content dedup hashes
-        for item in daily_5_content.get("items", []):
-            content_hash = hashlib.md5(
-                (item.get("title", "") + item.get("url", "")).encode()
-            ).hexdigest()
-            try:
-                client.table("content_history").insert({
-                    "user_id": user_id,
-                    "content_hash": content_hash,
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                }).execute()
-            except Exception:
-                pass
-
-        # Mark complete
-        client.table("generation_jobs").update({
-            "status": "completed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "newsletter_id": newsletter_id,
-        }).eq("id", job_id).execute()
-
-    except Exception as e:
-        print(f"Digest generation error: {e}")
-        traceback.print_exc()
-        client.table("generation_jobs").update({
-            "status": "failed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "error": str(e)[:500],
-        }).eq("id", job_id).execute()
+    await run_generation_pipeline(
+        user_id=user_id,
+        job_id=job_id,
+        user_profile=user_profile,
+        github_token=github_token,
+        research_data=research_data,
+        newsletter_extra_fields={"source": "mcp_interest_graph"},
+    )
 
 
 def _interest_graph_to_profile(
