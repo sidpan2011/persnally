@@ -20,9 +20,28 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Persnally API", version="1.0.0", lifespan=lifespan)
 
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Add configured frontend URL (strip trailing slash)
+if FRONTEND_URL:
+    allowed_origins.append(FRONTEND_URL.rstrip("/"))
+
+# Add common Vercel preview/production URLs
+VERCEL_URLS = [
+    "https://persnally.vercel.app",
+    "https://persnally.com",
+    "https://www.persnally.com",
+]
+for url in VERCEL_URLS:
+    if url not in allowed_origins:
+        allowed_origins.append(url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
