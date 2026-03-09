@@ -12,9 +12,11 @@ and triggers the full pipeline: research → AI curation → validation → Rese
 
 import hashlib
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
+from middleware.auth_middleware import get_current_user
 from services.engine_bridge import run_generation_pipeline
 from services.supabase_client import get_service_client
 
@@ -205,6 +207,120 @@ async def sync_interest_graph(
         print(f"Sync warning: {e}")
 
     return {"status": "synced", "total_signals": payload.total_signals}
+
+
+# ── Interest Graph Endpoints (for web dashboard) ──────────────
+
+
+@router.get("/interests")
+async def get_interests(user: dict = Depends(get_current_user)):
+    """Get the user's current interest graph for dashboard display."""
+    client = get_service_client()
+
+    snapshot = (
+        client.table("interest_snapshots")
+        .select("interest_graph, balanced_allocation, total_signals, synced_at")
+        .eq("user_id", user["id"])
+        .maybe_single()
+        .execute()
+    )
+
+    if not snapshot or not snapshot.data:
+        return {
+            "has_data": False,
+            "interest_graph": {"topics": [], "categories": {}, "total_signals": 0},
+            "balanced_allocation": {},
+            "total_signals": 0,
+            "synced_at": None,
+        }
+
+    return {
+        "has_data": True,
+        **snapshot.data,
+    }
+
+
+@router.get("/stats")
+async def get_dashboard_stats(user: dict = Depends(get_current_user)):
+    """Get aggregated stats for the dashboard overview."""
+    client = get_service_client()
+
+    # Interest snapshot
+    snapshot = (
+        client.table("interest_snapshots")
+        .select("interest_graph, total_signals, synced_at")
+        .eq("user_id", user["id"])
+        .maybe_single()
+        .execute()
+    )
+
+    # Newsletter count and last sent
+    newsletters = (
+        client.table("newsletters")
+        .select("id, sent_at, quality_score")
+        .eq("user_id", user["id"])
+        .order("sent_at", desc=True)
+        .limit(5)
+        .execute()
+    )
+
+    # Preferences
+    prefs = (
+        client.table("user_preferences")
+        .select("send_frequency")
+        .eq("user_id", user["id"])
+        .maybe_single()
+        .execute()
+    )
+
+    graph = snapshot.data.get("interest_graph", {}) if snapshot and snapshot.data else {}
+    topics = graph.get("topics", [])
+    categories = graph.get("categories", {})
+    newsletter_list = newsletters.data if newsletters and newsletters.data else []
+
+    # Compute stats
+    total_topics = len(topics)
+    total_signals = snapshot.data.get("total_signals", 0) if snapshot and snapshot.data else 0
+    total_digests = len(newsletter_list)
+    avg_quality = (
+        round(sum(n.get("quality_score", 0) for n in newsletter_list) / len(newsletter_list))
+        if newsletter_list
+        else 0
+    )
+    last_synced = snapshot.data.get("synced_at") if snapshot and snapshot.data else None
+    last_digest = newsletter_list[0].get("sent_at") if newsletter_list else None
+    frequency = prefs.data.get("send_frequency", "daily") if prefs and prefs.data else "daily"
+
+    # Top categories
+    top_categories = sorted(categories.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    # Intent breakdown
+    intent_counts: dict = {}
+    for t in topics:
+        intent = t.get("intent", "other")
+        intent_counts[intent] = intent_counts.get(intent, 0) + 1
+
+    # Sentiment breakdown
+    sentiment_positive = sum(1 for t in topics if t.get("sentiment_balance", t.get("sentiment", 0)) > 0.2)
+    sentiment_negative = sum(1 for t in topics if t.get("sentiment_balance", t.get("sentiment", 0)) < -0.2)
+    sentiment_neutral = total_topics - sentiment_positive - sentiment_negative
+
+    return {
+        "total_topics": total_topics,
+        "total_signals": total_signals,
+        "total_digests": total_digests,
+        "avg_quality": avg_quality,
+        "last_synced": last_synced,
+        "last_digest": last_digest,
+        "frequency": frequency,
+        "top_categories": [{"name": c[0], "weight": round(c[1], 2)} for c in top_categories],
+        "intent_breakdown": intent_counts,
+        "sentiment": {
+            "positive": sentiment_positive,
+            "negative": sentiment_negative,
+            "neutral": sentiment_neutral,
+        },
+    }
 
 
 # ── Schedule Status ─────────────────────────────────────────────
