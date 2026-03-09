@@ -1,0 +1,29 @@
+{
+  "name": "persnally-mcp",
+  "version": "1.0.0",
+  "description": "Persnally MCP Server — AI-native personalized intelligence that learns from your conversations",
+  "main": "build/index.js",
+  "bin": {
+    "persnally-mcp": "build/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc && node -e \"import('fs').then(fs => fs.chmodSync('build/index.js', '755'))\"",
+    "start": "node build/index.js",
+    "dev": "tsc && node build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.5.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "typescript": "^5.7.3"
+  },
+  "keywords": ["mcp", "personalization", "ai", "newsletter", "resend"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sidpan2011/persnally"
+  }
+}
