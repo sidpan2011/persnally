@@ -1,1 +1,1 @@
-# Daily Creator AI - Main Package
+# Persnally - Intelligence Engine
