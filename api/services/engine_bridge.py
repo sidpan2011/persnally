@@ -6,7 +6,7 @@ import asyncio
 import json
 import hashlib
 from datetime import datetime
-from api.services.supabase_client import get_service_client
+from services.supabase_client import get_service_client
 
 
 async def run_generation_for_user(user_id: str, job_id: str):

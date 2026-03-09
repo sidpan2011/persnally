@@ -1,7 +1,7 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from api.middleware.auth_middleware import get_current_user
-from api.services.supabase_client import get_service_client
+from middleware.auth_middleware import get_current_user
+from services.supabase_client import get_service_client
 
 router = APIRouter(prefix="/github", tags=["github"])
 
