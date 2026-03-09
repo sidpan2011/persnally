@@ -1,84 +1,102 @@
-# Persnally MCP Server
+# Persnally
 
-An AI-native personalized intelligence engine that learns from your conversations and curates daily digests tailored to your interests.
+An MCP server that learns from your conversations with Claude and sends you personalized digests.
+
+**Your AI already knows what you care about.** Persnally gives it a way to remember.
 
 ## How It Works
 
-1. **Install** as an MCP server in Claude Desktop or any MCP-compatible client
-2. **Chat naturally** — the AI calls `persnally_track` to note topics you're interested in
-3. **Interest graph builds** locally with exponential decay, sentiment tracking, and depth scoring
-4. **Trigger a digest** and receive a curated email via Resend with content matched to your interests
+1. You install Persnally as an MCP server in Claude Desktop
+2. As you chat, Claude calls `persnally_track` to note what you're interested in
+3. Persnally builds a local interest graph (no raw messages stored)
+4. Daily/weekly, it curates a personalized digest and emails it via Resend
 
-**Privacy by architecture**: Only structured signals are stored (topic, weight, category). Raw conversations never leave your machine.
-
-## Quick Start
-
-### Install
+## Install
 
 ```bash
-npm install -g persnally-mcp
+npm install -g persnally
 ```
 
-### Configure Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "persnally": {
-      "command": "persnally-mcp"
+      "command": "persnally",
+      "args": []
     }
   }
 }
 ```
 
-### Configure Your Email
+Restart Claude Desktop, then tell Claude:
 
-In any Claude conversation:
-> "Set my Persnally email to alice@example.com"
+> "Set my Persnally email to me@example.com"
 
-Claude will call `persnally_config` automatically.
+That's it. Start chatting — Persnally learns automatically.
 
-## Tools
+## MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `persnally_track` | Track topics from conversations (called automatically by the AI) |
-| `persnally_interests` | View your current interest profile |
-| `persnally_digest` | Generate and send a personalized digest email |
-| `persnally_config` | Configure email, frequency, API key |
-| `persnally_forget` | Remove topics or clear all data |
+| `persnally_track` | Extracts topics, intent, and sentiment from conversations. Called automatically by Claude. |
+| `persnally_interests` | Shows your current interest profile grouped by category. |
+| `persnally_digest` | Generates and sends your personalized digest email. |
+| `persnally_config` | Set email, frequency (daily/weekly), API preferences. |
+| `persnally_forget` | Remove a topic or clear all data. Full privacy control. |
 
-## Interest Engine
+## Interest Graph
 
-The interest engine uses several signals to build your profile:
+Persnally doesn't just store a flat list of interests. It builds a weighted graph with:
 
-- **Exponential decay** (half-life: 7 days) — recent interests matter more
-- **Depth scoring** — a deep conversation about Rust outweighs 10 brief mentions
-- **Sentiment tracking** — "I hate CSS" deprioritizes CSS, doesn't boost it
-- **Balanced allocation** — if you're 60% tech + 30% business + 10% finance, your digest reflects that ratio
-- **Intent classification** — learning, building, researching, deciding, discussing, debugging
+- **Exponential decay** — 7-day half-life keeps the graph fresh
+- **Sentiment awareness** — "I hate CSS" deprioritizes CSS content
+- **Depth scoring** — A brief mention scores differently than a deep dive
+- **Intent tracking** — Learning, building, researching, debugging shape content selection
+- **Topic normalization** — "React.js", "React JS", "ReactJS" all merge to one node
+- **Balanced allocation** — Digest covers multiple categories proportionally
 
-## Data Storage
+## Privacy
 
-All data is stored locally at `~/.persnally/`:
+Only structured signals are stored:
 
-- `interest-graph.json` — your interest profile
-- `config.json` — email, frequency, preferences
+```
++ Topic name (e.g., "Rust async programming")
++ Weight (0.1 to 1.0)
++ Category, intent, sentiment
++ Entity names (e.g., "tokio", "axum")
+```
 
-No data is sent anywhere unless you explicitly trigger a digest with an API key configured.
+**Never stored:** your messages, Claude's responses, code snippets, personal information.
+
+Your interest graph is a JSON file at `~/.persnally/interest-graph.json`. Read it, edit it, or delete it anytime.
+
+## Configuration
+
+```
+# Via Claude
+"Set my Persnally email to me@example.com"
+"Change my digest frequency to weekly"
+"Show my Persnally interests"
+"Remove Rust from my Persnally profile"
+"Clear all my Persnally data"
+
+# Environment variables (optional)
+PERSNALLY_API_URL=https://api.persnally.com
+PERSNALLY_API_KEY=your-key
+```
 
 ## Development
 
 ```bash
-git clone https://github.com/sidpan2011/persnally
-cd mcp_server/persnally
+git clone https://github.com/sidpan2011/persnally.git
+cd persnally/mcp_server/persnally
 npm install
 npm run build
-npm start
+npm test
 ```
 
 ## License
 
-MIT
+MIT — [github.com/sidpan2011/persnally](https://github.com/sidpan2011/persnally)
