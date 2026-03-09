@@ -129,3 +129,4 @@ dmypy.json
 node_modules/
 web/.next/
 web/.env.local
+.npmrc
