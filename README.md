@@ -1,5 +1,9 @@
 # Persnally
 
+[![CI](https://github.com/sidpan2011/persnally/actions/workflows/ci.yml/badge.svg)](https://github.com/sidpan2011/persnally/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/persnally)](https://www.npmjs.com/package/persnally)
+[![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
+
 **Your AI conversations already know what you care about. Persnally turns that into a personalized daily digest.**
 
 An open-source MCP server that plugs into Claude, ChatGPT, or any MCP-compatible client. It passively learns your interests from natural conversation — no forms, no onboarding, no manual tagging — and delivers curated content straight to your inbox via Resend.
@@ -33,7 +37,7 @@ Personalized digest arrives via Resend
 ### 1. Install the MCP Server
 
 ```bash
-npm install -g persnally-mcp
+npm install -g persnally
 ```
 
 ### 2. Add to Claude Desktop
@@ -44,7 +48,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "persnally": {
-      "command": "persnally-mcp"
+      "command": "persnally",
+      "args": []
     }
   }
 }
@@ -82,6 +87,7 @@ The engine is designed to mirror how human interests actually work:
 - **Balanced allocation** — if you're 60% tech, 30% business, 10% finance, your digest reflects that exact ratio
 - **Intent classification** — learning vs building vs researching vs debugging produces different content
 - **Entity extraction** — tracks specific tools, companies, and concepts, not just vague categories
+- **Topic normalization** — "React.js", "React JS", and "ReactJS" all merge to a single node
 
 ## Privacy by Architecture
 
@@ -106,7 +112,7 @@ This isn't "we promise we don't read your messages." This is **structurally impo
                        │ MCP Protocol (stdio)
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│  Persnally MCP Server (runs locally)                    │
+│  Persnally MCP Server (runs locally on your machine)    │
 │                                                         │
 │  Interest Engine:                                       │
 │  - Signal processing (weight × depth × sentiment)       │
@@ -162,7 +168,7 @@ When you trigger a digest, the API runs a multi-stage pipeline:
 
 ```
 persnally/
-├── mcp_server/persnally/        # Open-source MCP server (npm package)
+├── mcp_server/persnally/        # MCP server (npm: persnally)
 │   └── src/
 │       ├── index.ts             # MCP tools (track, interests, digest, config, forget)
 │       ├── interest-engine.ts   # Interest graph with decay + balancing
@@ -171,77 +177,101 @@ persnally/
 │   ├── routers/
 │   │   ├── digest.py            # Digest generation from interest graph
 │   │   ├── skills.py            # Skill DNA analysis
-│   │   ├── newsletters.py       # Newsletter management
 │   │   └── ...
 │   └── services/
-│       ├── engine_bridge.py     # Curation engine integration
-│       └── career_bridge.py     # Skill analyzer integration
+│       ├── engine_bridge.py     # Shared curation pipeline
+│       └── scheduler.py         # Automated digest scheduling
 ├── src/                         # Core intelligence engine
 │   ├── ai_engine.py             # AI curation with Claude Sonnet 4
-│   ├── behavior_analyzer.py     # GitHub behavioral analysis
-│   ├── content_validator.py     # Quality validation
+│   ├── fresh_content_generator.py # GitHub + HN content sourcing
+│   ├── content_validator.py     # Relevance + quality validation
 │   ├── skill_analyzer.py        # Skill DNA framework detection
-│   └── email_sender.py          # Resend email delivery
+│   ├── topic_utils.py           # Synonym matching (46 domains)
+│   └── cache.py                 # TTL cache for API calls
 ├── web/                         # Next.js frontend (Vercel)
 │   └── src/app/
-│       └── dashboard/
-│           ├── page.tsx          # Career intelligence overview
-│           └── skills/page.tsx   # Skill DNA visualization
+│       ├── page.tsx             # Landing page
+│       └── dashboard/           # Skill DNA, digests, preferences
+├── .github/workflows/ci.yml    # CI: lint, build, test, Docker
+├── Dockerfile.api               # API container (local dev)
+├── Dockerfile.web               # Web container (local dev)
+├── docker-compose.yml           # One-command local setup
 └── templates/                   # Email HTML templates
 ```
 
 ## Tech Stack
 
-- **MCP Server**: TypeScript, `@modelcontextprotocol/sdk`, Zod
-- **API**: FastAPI, Python 3.11+
-- **Frontend**: Next.js 16, Tailwind CSS
-- **AI**: Claude Sonnet 4 (Anthropic API)
-- **Email**: Resend MCP
-- **Auth**: Supabase (GitHub OAuth)
-- **Database**: Supabase PostgreSQL with RLS
-- **Deploy**: Railway (API), Vercel (Web)
+| Component | Technology |
+|-----------|-----------|
+| MCP Server | TypeScript, `@modelcontextprotocol/sdk`, Zod |
+| API | FastAPI, Python 3.12 |
+| Frontend | Next.js 16, Tailwind CSS v4 |
+| AI | Claude Sonnet 4 (Anthropic API) |
+| Email | Resend |
+| Auth | Supabase (GitHub OAuth) |
+| Database | Supabase PostgreSQL with RLS |
+| CI/CD | GitHub Actions |
+| Deploy | Railway (API), Vercel (Web) |
+| Linting | Ruff (Python), TypeScript strict mode |
 
 ## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions.
 
 ```bash
 # MCP Server
 cd mcp_server/persnally
 npm install && npm run build
-npm start
+npm test                        # runs E2E test suite
 
 # API
-cd api
 pip install -r requirements.txt
-uvicorn main:app --reload
+cd api && uvicorn main:app --reload
 
 # Web
 cd web
 npm install && npm run dev
+
+# Docker (all services)
+docker compose up
 ```
 
 ## Environment Variables
 
+Copy `.env.example` to `.env` and fill in your values. See the example file for descriptions of each variable.
+
 ### API (.env)
-```bash
-ANTHROPIC_API_KEY=       # Required — Claude API
-RESEND_API_KEY=          # Required — email delivery
-SUPABASE_URL=            # Required — database
-SUPABASE_ANON_KEY=       # Required — client auth
-SUPABASE_SERVICE_ROLE_KEY= # Required — server operations
-GITHUB_TOKEN=            # Optional — higher rate limits
-FRONTEND_URL=            # Production frontend URL
-```
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | Yes | Claude API for content curation |
+| `RESEND_API_KEY` | Yes | Email delivery |
+| `SUPABASE_URL` | Yes | Database |
+| `SUPABASE_ANON_KEY` | Yes | Client auth |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server operations |
+| `GITHUB_TOKEN` | No | Higher API rate limits |
+| `FRONTEND_URL` | Yes | Production frontend URL for CORS |
 
-### MCP Server (environment or ~/.persnally/config.json)
-```bash
-PERSNALLY_API_URL=       # API endpoint (default: https://api.persnally.com)
-PERSNALLY_API_KEY=       # API key for digest generation
-```
+### MCP Server (environment or `~/.persnally/config.json`)
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PERSNALLY_API_URL` | No | API endpoint (default: https://api.persnally.com) |
+| `PERSNALLY_API_KEY` | No | API key for digest generation |
 
-## Built For
+## Contributing
 
-Resend MCP Hackathon — Built with Anthropic Claude API + Resend MCP for email delivery.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+Areas where help is especially welcome:
+- More MCP client support (Cursor, ChatGPT, etc.)
+- Interest engine improvements (topic relationships, better normalization)
+- Content sources (new data sources for digest curation)
+- Email templates (better digest designs)
+- Tests (unit tests for engine and API)
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) for details.
