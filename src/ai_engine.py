@@ -66,7 +66,7 @@ class AIEditorialEngine:
             # Step 3: Content validation
             print("🔍 Validating content quality...")
             try:
-                validation_result = validator.validate_daily_5(daily_5_content, user_profile)
+                validation_result = validator.validate_daily_5(daily_5_content, user_profile, behavioral_data)
             except Exception as val_err:
                 print(f"⚠️ Validation error (accepting content): {val_err}")
                 validation_result = {

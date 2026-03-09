@@ -68,9 +68,9 @@ The user has explicitly opted in to having their conversation topics tracked for
       intent: z.enum(["learning", "building", "researching", "deciding", "discussing", "debugging"]).describe("What the user is doing with this topic"),
       sentiment: z.enum(["positive", "negative", "neutral"]).describe("User's sentiment toward this topic"),
       depth: z.enum(["mention", "moderate", "deep"]).describe("How deeply the user engaged with this topic"),
-      category: z.string().describe("Topic category: technology, business, finance, career, health, science, creative, education, lifestyle, news, other"),
+      category: z.enum(["technology", "business", "finance", "career", "health", "science", "creative", "education", "lifestyle", "news", "other"]).describe("Topic category"),
       entities: z.array(z.string()).describe("Specific entities mentioned: tool names, company names, people, concepts"),
-    })).describe("Array of topics extracted from the current conversation"),
+    })).min(1).describe("Array of topics extracted from the current conversation"),
   },
   async ({ topics }) => {
     const signals: TopicSignal[] = topics.map(t => ({

@@ -1,11 +1,12 @@
 """
 Flexible content validation - balances quality with achievability
 """
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 import re
 from datetime import datetime, timedelta
 import httpx
 import asyncio
+from .topic_utils import relevance_score
 
 class ContentValidator:
     def __init__(self):
@@ -227,7 +228,7 @@ class ContentValidator:
                 india_count += 1
 
             # Calculate confidence score for this item
-            confidence = self.calculate_confidence_score(item, behavioral_data)
+            confidence = self.calculate_confidence_score(item, behavioral_data, user_profile)
             confidence_scores.append(confidence)
             warnings.append(f"Item {i+1} confidence: {confidence['score']}/100 ({confidence['confidence_level']}) - {confidence['explanation']}")
         
@@ -241,6 +242,11 @@ class ContentValidator:
             if india_count > 0:
                 warnings.append(f"INFO: {india_count}/5 items are India-specific (nice to have, not required)")
         
+        # Check overall relevance — reject if majority of items are irrelevant
+        overall_relevant, overall_reason = self._check_overall_relevance(items, user_profile)
+        if not overall_relevant:
+            errors.append(f"REJECTED: {overall_reason}")
+
         # In strict mode, any errors cause rejection
         if strict_mode and errors:
             return {
@@ -275,6 +281,51 @@ class ContentValidator:
             }
         }
     
+    def _check_relevance(self, item: dict, user_profile: dict) -> Tuple[bool, str, int]:
+        """Check whether an item is relevant to user interests using synonym-aware matching.
+
+        Returns:
+            (is_relevant, reason, score) where is_relevant is False only when
+            the item has ZERO connection to any user interest.
+        """
+        interests = list(user_profile.get('interests', []))
+
+        # Also pull topics from the interest graph when available
+        ig = user_profile.get('interest_graph', {})
+        if ig and ig.get('topics'):
+            for t in ig['topics']:
+                topic_name = t.get('topic', '')
+                if topic_name:
+                    interests.append(topic_name)
+
+        if not interests:
+            # No interests defined — can't judge relevance, so pass
+            return (True, "", 0)
+
+        text = ' '.join([
+            item.get('title', ''),
+            item.get('content', ''),
+            item.get('description', ''),
+        ])
+
+        score = relevance_score(text, interests)
+
+        if score == 0:
+            return (False, "Item has no relevance to user interests", score)
+        return (True, "", score)
+
+    def _check_overall_relevance(self, items: list, user_profile: dict) -> Tuple[bool, str]:
+        """Ensure at least 60% of items are relevant to user interests."""
+        relevant_count = 0
+        for item in items:
+            is_relevant, _, _ = self._check_relevance(item, user_profile)
+            if is_relevant:
+                relevant_count += 1
+
+        if len(items) > 0 and relevant_count < 3:
+            return (False, f"Less than 60% of items match user interests ({relevant_count}/{len(items)} relevant)")
+        return (True, "")
+
     def _validate_ethical_concerns(self, content: str, item_num: int) -> List[str]:
         """CRITICAL: Validate ethical concerns - financial risk, gambling, health claims"""
         errors = []
@@ -378,7 +429,15 @@ class ContentValidator:
         # HIGH: Check speculative language
         spec_warnings = self._validate_speculative_language(content, item_num)
         warnings.extend(spec_warnings)
-        
+
+        # Check relevance to user interests (warning-level, not rejection)
+        is_relevant, relevance_reason, rel_score = self._check_relevance(item, user_profile)
+        if not is_relevant:
+            warnings.append(f"Item {item_num} WARNING - RELEVANCE: {relevance_reason}")
+        else:
+            if rel_score > 0:
+                warnings.append(f"Item {item_num} INFO: Relevance score {rel_score} against user interests")
+
         # Check length with flexible rules
         word_count = len(content.split())
         min_words = self.VALIDATION_RULES["word_count"]["min"]
@@ -663,7 +722,7 @@ class ContentValidator:
 
         return errors
 
-    def calculate_confidence_score(self, item: Dict, behavioral_data: Dict) -> Dict[str, Any]:
+    def calculate_confidence_score(self, item: Dict, behavioral_data: Dict, user_profile: Dict = None) -> Dict[str, Any]:
         """
         Calculate confidence score for a recommendation based on evidence strength.
 
@@ -671,6 +730,7 @@ class ContentValidator:
         - Tier 1 (Verifiable Facts): 40 points max - objective info from authoritative sources
         - Tier 2 (Benchmarks & Comparisons): 30 points max - performance claims, metrics
         - Tier 3 (User-Specific Claims): 30 points max - claims about user's code/usage
+        - Relevance bonus: up to +10 points (capped at 100 total)
 
         From EDITORIAL_GUIDELINES.md evidence standards.
         """
@@ -754,6 +814,16 @@ class ContentValidator:
         breakdown['tier3_user_specific'] = min(tier3_score, 30)
         score += breakdown['tier3_user_specific']
 
+        # ===== Relevance Bonus (up to +10) =====
+        relevance_bonus = 0
+        if user_profile:
+            _, _, rel_score = self._check_relevance(item, user_profile)
+            # Cap bonus at 10 points: 2 points per relevance point, max 10
+            relevance_bonus = min(rel_score * 2, 10)
+        breakdown['relevance_bonus'] = relevance_bonus
+        score += relevance_bonus
+        score = min(score, 100)
+
         # ===== Confidence Level =====
         if score >= 80:
             confidence_level = "HIGH"
@@ -781,6 +851,9 @@ class ContentValidator:
 
         if breakdown['tier3_user_specific'] > 0:
             explanations.append(f"user-specific evidence ({breakdown['tier3_user_specific']}/30)")
+
+        if breakdown.get('relevance_bonus', 0) > 0:
+            explanations.append(f"relevance bonus ({breakdown['relevance_bonus']}/10)")
 
         if not explanations:
             return "No strong evidence detected"
