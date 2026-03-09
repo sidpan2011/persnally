@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import FRONTEND_URL
-from routers import health, users, preferences, newsletters, github
+from routers import health, users, preferences, newsletters, github, skills
 
 app = FastAPI(title="Persnally API", version="1.0.0")
 
@@ -18,3 +18,4 @@ app.include_router(users.router)
 app.include_router(preferences.router)
 app.include_router(newsletters.router)
 app.include_router(github.router)
+app.include_router(skills.router)
