@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 import traceback
-from api.middleware.auth_middleware import get_current_user
-from api.models.schemas import PreferencesUpdate
-from api.services.supabase_client import get_service_client
+from middleware.auth_middleware import get_current_user
+from models.schemas import PreferencesUpdate
+from services.supabase_client import get_service_client
 
 router = APIRouter(prefix="/preferences", tags=["preferences"])
 

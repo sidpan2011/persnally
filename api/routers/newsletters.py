@@ -1,9 +1,9 @@
 import traceback
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from api.middleware.auth_middleware import get_current_user
-from api.models.schemas import GenerateResponse, JobStatus
-from api.services.supabase_client import get_service_client
-from api.services.engine_bridge import run_generation_for_user
+from middleware.auth_middleware import get_current_user
+from models.schemas import GenerateResponse, JobStatus
+from services.supabase_client import get_service_client
+from services.engine_bridge import run_generation_for_user
 
 router = APIRouter(prefix="/newsletters", tags=["newsletters"])
 

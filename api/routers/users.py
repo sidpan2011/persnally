@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
-from api.middleware.auth_middleware import get_current_user
-from api.models.schemas import UserUpdate
-from api.services.supabase_client import get_service_client
+from middleware.auth_middleware import get_current_user
+from models.schemas import UserUpdate
+from services.supabase_client import get_service_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 

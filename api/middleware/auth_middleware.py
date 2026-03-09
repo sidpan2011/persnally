@@ -1,5 +1,5 @@
 from fastapi import Request, HTTPException
-from api.services.supabase_client import get_service_client
+from services.supabase_client import get_service_client
 import traceback
 
 
