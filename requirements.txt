@@ -1,12 +1,17 @@
 # Core Framework
 python-dotenv==1.0.0
 
+# API Server
+fastapi>=0.104.0
+uvicorn>=0.24.0
+supabase>=2.0.0
+
 # AI Processing
 openai>=1.0.0
 anthropic>=0.18.0
 
 # HTTP Clients
-httpx==0.25.2
+httpx>=0.25.2
 
 # Web Scraping
 beautifulsoup4>=4.12.0
@@ -16,7 +21,7 @@ feedparser>=6.0.10
 jinja2==3.1.2
 
 # Data Handling
-pydantic==2.5.0
+pydantic>=2.5.0
 
 # Date/Time
 python-dateutil==2.8.2
