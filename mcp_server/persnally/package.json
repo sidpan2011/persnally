@@ -1,16 +1,27 @@
 {
-  "name": "persnally-mcp",
+  "name": "persnally",
   "version": "1.0.0",
-  "description": "Persnally MCP Server — AI-native personalized intelligence that learns from your conversations",
+  "description": "MCP server that learns from your AI conversations and sends personalized digests",
   "main": "build/index.js",
   "bin": {
-    "persnally-mcp": "build/index.js"
+    "persnally": "build/index.js"
   },
   "type": "module",
   "scripts": {
     "build": "tsc && node -e \"import('fs').then(fs => fs.chmodSync('build/index.js', '755'))\"",
+    "prepublishOnly": "npm run build",
     "start": "node build/index.js",
-    "dev": "tsc && node build/index.js"
+    "dev": "tsc && node build/index.js",
+    "test": "node test-e2e.mjs"
+  },
+  "files": [
+    "build/**/*.js",
+    "build/**/*.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.5.0",
@@ -20,10 +31,25 @@
     "@types/node": "^22.13.5",
     "typescript": "^5.7.3"
   },
-  "keywords": ["mcp", "personalization", "ai", "newsletter", "resend"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "personalization",
+    "ai",
+    "claude",
+    "interest-graph",
+    "newsletter",
+    "digest",
+    "resend"
+  ],
   "license": "MIT",
+  "author": "Sidhanth Pandey",
+  "homepage": "https://persnally.com",
   "repository": {
     "type": "git",
     "url": "https://github.com/sidpan2011/persnally"
+  },
+  "bugs": {
+    "url": "https://github.com/sidpan2011/persnally/issues"
   }
 }
