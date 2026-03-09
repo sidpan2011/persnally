@@ -12,9 +12,9 @@ import re
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 class PremiumEmailSender:
-    def __init__(self, config, mcp_orchestrator):
+    def __init__(self, config, resend_client):
         self.config = config
-        self.mcp_orchestrator = mcp_orchestrator
+        self.resend_client = resend_client
         self.image_fetcher = ImageFetcher()
         self.content_formatter = ContentFormatter()
     
@@ -37,7 +37,7 @@ class PremiumEmailSender:
         subject = daily_5_content['subject_line']
 
         # Send via MCP orchestrator
-        success = await self.mcp_orchestrator.send_email(
+        success = await self.resend_client.send_email_via_mcp(
             user_data['email'],
             subject,
             html_content
@@ -60,7 +60,7 @@ class PremiumEmailSender:
         subject = self._create_premium_subject_line(user_data, editorial_content)
         
         # Send via MCP orchestrator
-        success = await self.mcp_orchestrator.send_email(
+        success = await self.resend_client.send_email_via_mcp(
             user_data['email'],
             subject,
             html_content
