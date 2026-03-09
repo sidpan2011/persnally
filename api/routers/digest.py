@@ -203,6 +203,41 @@ async def sync_interest_graph(
     return {"status": "synced", "total_signals": payload.total_signals}
 
 
+# ── Schedule Status ─────────────────────────────────────────────
+
+@router.get("/schedule/status")
+async def get_schedule_status(user: dict = Depends(verify_api_key_or_user)):
+    """Check when the user's next digest is scheduled."""
+    client = get_service_client()
+
+    last = (
+        client.table("newsletters")
+        .select("sent_at")
+        .eq("user_id", user["id"])
+        .order("sent_at", desc=True)
+        .limit(1)
+        .maybe_single()
+        .execute()
+    )
+
+    prefs = (
+        client.table("user_preferences")
+        .select("send_frequency")
+        .eq("user_id", user["id"])
+        .maybe_single()
+        .execute()
+    )
+    frequency = prefs.data.get("send_frequency", "daily") if prefs and prefs.data else "daily"
+
+    last_sent = last.data["sent_at"] if last and last.data else None
+
+    return {
+        "frequency": frequency,
+        "last_sent": last_sent,
+        "next_expected": "within 24 hours" if frequency == "daily" else "within 7 days",
+    }
+
+
 # ── Background Digest Generation ────────────────────────────────
 
 async def run_interest_digest(

@@ -19,7 +19,7 @@
  * 5. NO RAW MESSAGES: We only store structured signals. Privacy by architecture.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -132,6 +132,12 @@ export class InterestEngine {
     this.graph.total_conversations += 1;
     this.graph.updated_at = new Date().toISOString();
     this.recalculateCategories();
+
+    // Prune stale nodes every 50 signals to prevent unbounded graph growth
+    if (this.graph.total_signals % 50 === 0) {
+      this.pruneStaleNodes();
+    }
+
     this.save();
 
     return { tracked: trackedTopics.length, topics: trackedTopics };
@@ -201,11 +207,10 @@ export class InterestEngine {
     // Depth bonus: deeper engagement = stronger signal
     const depthBonus = node.avg_depth * 0.3;
 
-    // Sentiment penalty: negative sentiment reduces weight
-    const sentimentMultiplier = node.sentiment_balance < -0.3 ? 0.3 :
-                                 node.sentiment_balance < 0 ? 0.7 : 1.0;
+    // Sentiment penalty: negative sentiment reduces weight (smooth linear gradient)
+    const sentimentMultiplier = Math.max(0.2, 1.0 + (Math.min(node.sentiment_balance, 0) * 0.8));
 
-    const weight = node.raw_weight * decayMultiplier * sentimentMultiplier + frequencyBonus + depthBonus;
+    const weight = node.raw_weight * decayMultiplier * sentimentMultiplier * (1 + frequencyBonus + depthBonus);
     return Math.min(Math.max(weight, 0), 10); // cap at 10
   }
 
@@ -341,6 +346,34 @@ export class InterestEngine {
   }
 
   // ──────────────────────────────────────────
+  // GRAPH MAINTENANCE
+  // ──────────────────────────────────────────
+
+  /**
+   * Remove nodes with negligible weight AND older than 90 days.
+   * Prevents unbounded graph growth from one-off mentions.
+   */
+  private pruneStaleNodes(): void {
+    const now = Date.now();
+    const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+    let pruned = 0;
+
+    for (const [key, node] of Object.entries(this.graph.nodes)) {
+      const lastSeen = new Date(node.last_seen).getTime();
+      const age = now - lastSeen;
+      if (node.current_weight < 0.01 && age > NINETY_DAYS_MS) {
+        delete this.graph.nodes[key];
+        pruned++;
+      }
+    }
+
+    if (pruned > 0) {
+      console.error(`Pruned ${pruned} stale node(s) from interest graph`);
+      this.recalculateCategories();
+    }
+  }
+
+  // ──────────────────────────────────────────
   // PERSISTENCE
   // ──────────────────────────────────────────
 
@@ -354,10 +387,20 @@ export class InterestEngine {
     try {
       if (existsSync(GRAPH_FILE)) {
         const data = readFileSync(GRAPH_FILE, "utf-8");
-        return JSON.parse(data);
+        const graph = JSON.parse(data);
+        // Write backup on successful load
+        try { writeFileSync(GRAPH_FILE + '.bak', data); } catch {}
+        return graph;
       }
     } catch (e) {
-      console.error("Failed to load interest graph, starting fresh:", e);
+      console.error("Failed to load interest graph, trying backup:", e);
+      try {
+        if (existsSync(GRAPH_FILE + '.bak')) {
+          const data = readFileSync(GRAPH_FILE + '.bak', "utf-8");
+          return JSON.parse(data);
+        }
+      } catch {}
+      console.error("Backup also failed, starting fresh");
     }
     return this.emptyGraph();
   }
@@ -376,7 +419,9 @@ export class InterestEngine {
 
   private save(): void {
     try {
-      writeFileSync(GRAPH_FILE, JSON.stringify(this.graph, null, 2));
+      const tmpFile = GRAPH_FILE + '.tmp';
+      writeFileSync(tmpFile, JSON.stringify(this.graph, null, 2));
+      renameSync(tmpFile, GRAPH_FILE);
     } catch (e) {
       console.error("Failed to save interest graph:", e);
     }
@@ -402,7 +447,9 @@ export class InterestEngine {
 
   private saveConfig(): void {
     try {
-      writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2));
+      const tmpFile = CONFIG_FILE + '.tmp';
+      writeFileSync(tmpFile, JSON.stringify(this.config, null, 2));
+      renameSync(tmpFile, CONFIG_FILE);
     } catch (e) {
       console.error("Failed to save config:", e);
     }
@@ -413,7 +460,20 @@ export class InterestEngine {
   // ──────────────────────────────────────────
 
   private normalizeKey(topic: string): string {
-    return topic.toLowerCase().trim().replace(/[^a-z0-9\s\-\.\/\+#]/g, "").replace(/\s+/g, "_");
+    let key = topic.toLowerCase().trim();
+    // Normalize common variations before stripping
+    key = key.replace(/\.js\b/g, "js");       // "react.js" → "reactjs"
+    key = key.replace(/\.ts\b/g, "ts");       // "vue.ts" → "vuets"
+    key = key.replace(/\bnode\.js\b/g, "nodejs");
+    key = key.replace(/\bnext\.js\b/g, "nextjs");
+    key = key.replace(/\bvue\.js\b/g, "vuejs");
+    key = key.replace(/\breact\.js\b/g, "reactjs");
+    key = key.replace(/\bc\+\+/g, "cpp");
+    key = key.replace(/\bc#/g, "csharp");
+    key = key.replace(/\bf#/g, "fsharp");
+    key = key.replace(/[^a-z0-9\s\-]/g, ""); // strip remaining special chars
+    key = key.replace(/\s+/g, "_");
+    return key;
   }
 
   private recalculateCategories(): void {

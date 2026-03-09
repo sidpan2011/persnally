@@ -1,9 +1,22 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import FRONTEND_URL
 from routers import health, users, preferences, newsletters, github, skills, digest
 
-app = FastAPI(title="Persnally API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Start digest scheduler on startup
+    from services.scheduler import digest_scheduler_loop
+    task = asyncio.create_task(digest_scheduler_loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="Persnally API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
