@@ -18,7 +18,14 @@ class FreshContentGenerator:
             self._github_headers["Authorization"] = f"Bearer {self.github_token}"
 
     async def generate_fresh_daily_5(self, user_profile: dict) -> List[Dict[str, Any]]:
-        """Generate 5 pieces of genuinely fresh, well-written content"""
+        """Generate 5 pieces of genuinely fresh, well-written content.
+
+        If the user_profile contains an interest_graph (from MCP digest flow),
+        delegates to generate_from_interest_graph for targeted queries.
+        """
+        # Delegate to interest-graph-aware path when available
+        if user_profile.get("interest_graph"):
+            return await self.generate_from_interest_graph(user_profile)
 
         print("Generating FRESH Daily 5 content...")
 
@@ -39,6 +46,78 @@ class FreshContentGenerator:
             self._build_opportunity(gh_opportunity, interests),
             self._build_learn(gh_learning, interests),
             self._build_insight(hn_stories, interests),
+        ]
+
+        return daily_5
+
+    async def generate_from_interest_graph(self, user_profile: dict) -> List[Dict[str, Any]]:
+        """Generate content driven by the MCP interest graph.
+
+        Extracts the top 5 topics by weight and uses them as targeted search
+        queries for GitHub and HN instead of generic trending fetches.
+        Falls back to the standard generate_fresh_daily_5 path when no
+        interest_graph is present.
+        """
+        interest_graph = user_profile.get("interest_graph")
+        if not interest_graph:
+            # Strip key so we don't recurse back here
+            return await self.generate_fresh_daily_5(user_profile)
+
+        topics = interest_graph.get("topics", [])
+        if not topics:
+            return await self.generate_fresh_daily_5(
+                {k: v for k, v in user_profile.items() if k != "interest_graph"}
+            )
+
+        # Top 5 topics by weight
+        sorted_topics = sorted(topics, key=lambda t: t.get("weight", 0), reverse=True)[:5]
+        top_queries = [t["topic"] for t in sorted_topics]
+
+        print(f"Interest-graph mode: querying for top topics {top_queries}")
+
+        interests = [i.lower() for i in user_profile.get("interests", [])]
+
+        # Fetch HN stories once, then targeted GitHub searches per topic
+        hn_coro = self._fetch_hn_top_stories(limit=50)
+        gh_trending_coros = [self._fetch_github_trending(interests, query=q) for q in top_queries]
+        gh_learning_coro = self._fetch_github_learning(interests)
+        gh_opportunity_coro = self._fetch_github_opportunity(interests)
+
+        results = await asyncio.gather(
+            hn_coro, gh_learning_coro, gh_opportunity_coro, *gh_trending_coros
+        )
+
+        hn_stories = results[0]
+        gh_learning = results[1]
+        gh_opportunity = results[2]
+        gh_trending_lists = results[3:]
+
+        # Merge all targeted GitHub results, de-duplicate by repo id
+        seen_ids = set()
+        gh_trending_merged: List[Dict[str, Any]] = []
+        for repo_list in gh_trending_lists:
+            for repo in repo_list:
+                rid = repo.get("id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    gh_trending_merged.append(repo)
+
+        # Filter HN stories to those matching any interest-graph topic keyword
+        topic_keywords = {kw.lower() for q in top_queries for kw in q.split()}
+        filtered_hn = [
+            s for s in hn_stories
+            if any(kw in s.get("title", "").lower() for kw in topic_keywords)
+        ]
+        # Fall back to full list if filter is too aggressive
+        if len(filtered_hn) < 5:
+            filtered_hn = hn_stories
+
+        daily_5 = [
+            self._build_breaking(filtered_hn, interests),
+            self._build_trending(gh_trending_merged, interests),
+            self._build_opportunity(gh_opportunity, interests),
+            self._build_learn(gh_learning, interests),
+            self._build_insight(filtered_hn, interests),
         ]
 
         return daily_5
@@ -76,14 +155,25 @@ class FreshContentGenerator:
             return []
 
     async def _fetch_github_trending(
-        self, interests: List[str]
+        self, interests: List[str], query: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Fetch trending GitHub repos created in the last 7 days."""
+        """Fetch trending GitHub repos.
+
+        When *query* is provided (interest-graph mode), search for that
+        specific topic sorted by stars instead of generic "created in last
+        7 days" trending.
+        """
+        if query:
+            # Targeted search for a specific interest-graph topic
+            search_q = f"{query} stars:>50"
+            return await self._github_search(search_q, sort="stars")
+
+        # Default: generic trending repos created in the last 7 days
         since = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
-        query = f"created:>{since} stars:>10"
+        search_q = f"created:>{since} stars:>10"
         if interests:
-            query += f" {interests[0]}"
-        return await self._github_search(query, sort="stars")
+            search_q += f" {interests[0]}"
+        return await self._github_search(search_q, sort="stars")
 
     async def _fetch_github_learning(
         self, interests: List[str]

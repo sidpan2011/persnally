@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 from .behavior_analyzer import BehaviorAnalyzer
 from .opportunity_matcher import OpportunityMatcher
 from .content_curator import ContentCurator
-from .system_prompts import USER_ANALYSIS_PROMPT, TOP5_UPDATES_PROMPT, CONTENT_GENERATION_PROMPT, BEHAVIORAL_ANALYSIS_PROMPT, LOCATION_RULES
+from .system_prompts import CONTENT_GENERATION_PROMPT, BEHAVIORAL_ANALYSIS_PROMPT, LOCATION_RULES
 from .content_validator import ContentValidator
 from .repo_analyzer import RepoFileAnalyzer
 from .web_opportunity_finder import WebOpportunityFinder
@@ -376,6 +376,39 @@ class AIEditorialEngine:
             user_interests = user_profile.get('interests', [])
             user_skills = user_profile.get('skills', [])
             user_goals = user_profile.get('goals', [])
+
+            # Enrich with interest graph data when available (MCP digest flow)
+            interest_graph_context = ""
+            ig = user_profile.get('interest_graph')
+            if ig and ig.get('topics'):
+                ig_topics = sorted(ig['topics'], key=lambda t: t.get('weight', 0), reverse=True)
+                weighted_lines = []
+                for t in ig_topics[:10]:
+                    entities = ', '.join(t.get('entities', [])[:5])
+                    line = f"  - {t['topic']} (weight {t.get('weight', 0):.2f}, intent: {t.get('intent', 'learning')})"
+                    if entities:
+                        line += f" [entities: {entities}]"
+                    weighted_lines.append(line)
+
+                ba = user_profile.get('balanced_allocation', {})
+                alloc_lines = []
+                for cat, data in ba.items():
+                    cat_topics = [tp['topic'] for tp in data.get('topics', [])]
+                    alloc_lines.append(f"  - {cat}: {data.get('allocation', 1)} items -> {', '.join(cat_topics)}")
+
+                interest_graph_context = (
+                    "\n\n═══════════════════════════════════════════════════════════════════\n"
+                    "INTEREST GRAPH (from MCP — higher weight = stronger signal):\n"
+                    "═══════════════════════════════════════════════════════════════════\n"
+                    "Weighted topics (prioritize higher-weight topics):\n"
+                    + "\n".join(weighted_lines)
+                )
+                if alloc_lines:
+                    interest_graph_context += (
+                        "\n\nBalanced content allocation (distribute items across categories):\n"
+                        + "\n".join(alloc_lines)
+                    )
+                interest_graph_context += "\n\nUse the weights and allocation above to decide how many items to dedicate to each area.\n"
             
             # REDUCED GitHub data - only essential context
             tech_using = behavioral_data.get('evidence', {}).get('technologies_using', [])
@@ -453,6 +486,10 @@ class AIEditorialEngine:
                 opportunities=json.dumps(opps_data, indent=2),  # Now contains hackathons and jobs
                 starred_repos=json.dumps([])  # RENAMED from user_starred_repos
             )
+
+            # Append interest graph context when available (MCP digest flow)
+            if interest_graph_context:
+                prompt += interest_graph_context
         except Exception as e:
             print(f"🚨 ERROR in _generate_content preparation: {e}")
             import traceback
@@ -543,507 +580,3 @@ class AIEditorialEngine:
                 print(f"❌ Fallback has unexpected type: {type(fallback_content)}")
                 # Last resort - create empty structure
                 return {"items": []}
-    
-    async def generate_premium_editorial(
-        self, 
-        user_profile: dict, 
-        research_data: dict
-    ) -> Dict[str, str]:
-        """Generate premium top-5 updates from real data (legacy method)"""
-        
-        print("🤖 AI Editorial Generation Process:")
-        print("  1️⃣ Analyzing user profile...")
-        user_analysis = await self._analyze_user_deeply(user_profile, research_data)
-        
-        print("  2️⃣ Selecting top 5 niche updates...")
-        top5_updates = await self._select_top5_updates(user_analysis, research_data)
-        
-        print("  3️⃣ Creating newsletter content...")
-        newsletter_content = await self._craft_newsletter_content(
-            user_profile, user_analysis, top5_updates, research_data
-        )
-        
-        return newsletter_content
-    
-    async def _analyze_user_deeply(self, user_profile: dict, research_data: dict) -> dict:
-        """Deep analysis combining profile and GitHub context to infer skills, interests, goals"""
-        
-        github_context = research_data.get("user_context", {})
-        
-        prompt = USER_ANALYSIS_PROMPT.format(
-            name=user_profile['name'],
-            email=user_profile['email'],
-            github_username=user_profile['github_username'],
-            user_interests=user_profile.get('interests', []),
-            user_info=json.dumps(github_context.get('user_info', {}), indent=2),
-            recent_repos=json.dumps(github_context.get('recent_repos', [])[:10], indent=2),
-            starred_repos=json.dumps(github_context.get('interests_from_stars', [])[:10], indent=2),
-            readme_content=github_context.get('readme_content', '')[:500],
-            repo_analysis=json.dumps(github_context.get('repo_analysis', {}), indent=2)
-        )
-        
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            max_tokens=1200,
-            temperature=0.3,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        try:
-            analysis = json.loads(response.choices[0].message.content)
-            # Ensure required fields exist
-            if "inferred_skills" not in analysis:
-                analysis["inferred_skills"] = ["Python", "JavaScript", "Development"]
-            if "inferred_interests" not in analysis:
-                analysis["inferred_interests"] = ["Technology", "Programming", "Innovation"]
-            if "experience_level" not in analysis:
-                analysis["experience_level"] = "intermediate"
-            return analysis
-        except:
-            # Simplified fallback based on GitHub data
-            repo_analysis = github_context.get('repo_analysis', {})
-            top_languages = [lang[0] for lang in repo_analysis.get('top_languages', [])[:3]]
-            
-            return {
-                "inferred_skills": top_languages or ["Python", "JavaScript"],
-                "inferred_interests": user_profile.get('interests', ["Technology", "Programming", "Innovation"]),
-                "inferred_goals": ["Build innovative projects", "Master new technologies"],
-                "experience_level": "intermediate",
-                "primary_domain": "web_development",
-                "content_style_preference": "technical_with_insights",
-                "interest_github_match": "Basic analysis of GitHub activity patterns"
-            }
-    
-    async def _select_top5_updates(self, user_analysis: dict, research_data: dict) -> dict:
-        """Select top 5 niche, specific updates from real data"""
-        
-        prompt = TOP5_UPDATES_PROMPT.format(
-            name=user_analysis.get('inferred_skills', ['Developer'])[0] + " developer",
-            inferred_skills=user_analysis.get('inferred_skills', []),
-            inferred_interests=user_analysis.get('inferred_interests', []),
-            inferred_goals=user_analysis.get('inferred_goals', []),
-            experience_level=user_analysis.get('experience_level', 'intermediate'),
-            primary_domain=user_analysis.get('primary_domain', 'web_development'),
-            current_focus=user_analysis.get('current_focus', 'general development'),
-            interest_github_match=user_analysis.get('interest_github_match', 'GitHub activity analysis'),
-            trending_repos=json.dumps(research_data.get('trending_repos', [])[:15], indent=2),
-            hackernews_stories=json.dumps(research_data.get('hackernews_stories', [])[:10], indent=2),
-            user_github_activity=json.dumps(research_data.get('user_context', {}).get('recent_repos', [])[:5], indent=2),
-            user_starred_repos=json.dumps(research_data.get('user_context', {}).get('interests_from_stars', [])[:5], indent=2)
-        )
-        
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            max_tokens=2000,
-            temperature=0.7,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        try:
-            updates_data = json.loads(response.choices[0].message.content)
-            return updates_data
-        except:
-            # Fallback: create 5 updates from available data
-            return {
-                "updates": [
-                    {
-                        "title": "Latest Development Trends",
-                        "content": f"Based on analysis of {len(research_data.get('trending_repos', []))} trending repositories, here are the key developments in your field.",
-                        "relevance_score": 8,
-                        "data_sources": ["GitHub trending repos"],
-                        "actionable_items": ["Explore trending repositories", "Review new frameworks"]
-                    }
-                ] * 5,
-                "overall_theme": "Current development trends",
-                "freshness_note": "Data from last 7 days"
-            }
-    
-    async def _craft_newsletter_content(
-        self, 
-        user_profile: dict,
-        user_analysis: dict, 
-        top5_updates: dict,
-        research_data: dict
-    ) -> Dict[str, str]:
-        """Craft newsletter content with top 5 updates"""
-        
-        current_date = datetime.now().strftime("%B %d, %Y")
-        
-        prompt = CONTENT_GENERATION_PROMPT.format(
-            name=user_profile['name'],
-            inferred_skills=user_analysis.get('inferred_skills', []),
-            inferred_interests=user_analysis.get('inferred_interests', []),
-            inferred_goals=user_analysis.get('inferred_goals', []),
-            experience_level=user_analysis.get('experience_level', 'intermediate'),
-            primary_domain=user_analysis.get('primary_domain', 'web_development'),
-            updates_data=json.dumps(top5_updates, indent=2)
-        )
-        
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            max_tokens=3000,
-            temperature=0.8,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        try:
-            content_text = response.choices[0].message.content
-            print(f"🔍 Raw AI response: {content_text[:200]}...")
-            
-            # Try to extract JSON from the response
-            if "```json" in content_text:
-                json_start = content_text.find("```json") + 7
-                json_end = content_text.find("```", json_start)
-                json_text = content_text[json_start:json_end].strip()
-            elif "{" in content_text and "}" in content_text:
-                json_start = content_text.find("{")
-                json_end = content_text.rfind("}") + 1
-                json_text = content_text[json_start:json_end]
-            else:
-                # Fallback: create content from the raw response
-                return {
-                    "headline": "Your Weekly Tech Intelligence",
-                    "intro": "Here are the top 5 updates tailored for your interests and GitHub activity.",
-                    "updates": [
-                        {
-                            "number": i+1,
-                            "title": f"Update {i+1}",
-                            "content": content_text
-                        }
-                        for i in range(5)
-                    ],
-                    "key_insights": ["AI-generated insights from current trends"],
-                    "data_sources": ["Real-time GitHub and web data"],
-                    "date": current_date
-                }
-            
-            content_data = json.loads(json_text)
-            return {
-                "headline": content_data.get("headline", "Your Weekly Tech Intelligence"),
-                "intro": content_data.get("intro", "Here are the top 5 updates tailored for your interests."),
-                "updates": content_data.get("updates", []),
-                "key_insights": content_data.get("key_insights", []),
-                "data_sources": content_data.get("data_sources", []),
-                "date": current_date
-            }
-        except Exception as e:
-            print(f"⚠️ Content generation failed: {e}")
-            # Create a meaningful fallback with real data
-            return {
-                "headline": "Your Weekly Tech Intelligence",
-                "intro": f"Based on analysis of {len(research_data.get('trending_repos', []))} trending repositories and {len(research_data.get('hackernews_stories', []))} HackerNews stories, here are the top 5 updates for your interests: {', '.join(user_analysis.get('inferred_interests', ['technology']))}.",
-                "updates": [
-                    {
-                        "number": i+1,
-                        "title": f"Update {i+1}: {user_analysis.get('inferred_interests', ['Technology'])[i % len(user_analysis.get('inferred_interests', ['Technology']))]}",
-                        "content": f"Based on your {user_analysis.get('primary_domain', 'development')} expertise and interest in {user_analysis.get('inferred_interests', ['technology'])[i % len(user_analysis.get('inferred_interests', ['technology']))]}, here are the latest developments and actionable insights."
-                    }
-                    for i in range(5)
-                ],
-                "key_insights": [
-                    f"Real-time analysis of {len(research_data.get('trending_repos', []))} trending repositories",
-                    f"Current HackerNews discussions and trends", 
-                    f"Personalized insights based on your {user_analysis.get('primary_domain', 'development')} expertise",
-                    f"Fresh data from the last 7 days"
-                ],
-                "data_sources": ["GitHub API", "HackerNews API", "Real-time analysis"],
-                "date": current_date
-            }
-    
-    async def _select_compelling_topic(self, user_analysis: dict, research_data: dict) -> dict:
-        """Select the most compelling topic from real data"""
-        
-        prompt = f"""
-        Select the perfect editorial topic from this REAL research data:
-        
-        USER ANALYSIS (INFERRED FROM GITHUB):
-        Skills: {user_analysis.get('inferred_skills', [])}
-        Interests: {user_analysis.get('inferred_interests', [])}
-        Goals: {user_analysis.get('inferred_goals', [])}
-        Experience Level: {user_analysis.get('experience_level', 'intermediate')}
-        Primary Domain: {user_analysis.get('primary_domain', 'web_development')}
-        Current Focus: {user_analysis.get('current_focus', 'general development')}
-        
-        REAL TRENDING REPOS (FRESH DATA):
-        {json.dumps(research_data.get('trending_repos', [])[:15], indent=2)}
-        
-        REAL HACKERNEWS STORIES (CURRENT):
-        {json.dumps(research_data.get('hackernews_stories', [])[:10], indent=2)}
-        
-        USER'S GITHUB CONTEXT:
-        Recent Activity: {json.dumps(research_data.get('user_context', {}).get('repo_analysis', {}).get('recent_activity', [])[:5], indent=2)}
-        Top Languages: {json.dumps(research_data.get('user_context', {}).get('repo_analysis', {}).get('top_languages', [])[:5], indent=2)}
-        
-        Find ONE topic that:
-        1. Uses specific real data from above (repos, stories, trends)
-        2. Perfectly matches user's INFERRED skills, interests, and goals
-        3. Provides genuine insights they can't get elsewhere
-        4. Has enough depth for 700-word editorial
-        5. Connects current trends with their specific professional focus
-        6. Considers their current GitHub activity patterns
-        
-        Return as JSON:
-        {{
-            "selected_topic": "specific topic using real data",
-            "angle": "unique perspective",
-            "supporting_data": ["specific repos/stories to reference"],
-            "why_now": "why this matters right now",
-            "personal_relevance": "why this matters to THIS user specifically based on their GitHub activity",
-            "motivation_hook": "what will make them excited to read this"
-        }}
-        """
-        
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            max_tokens=1200,
-            temperature=0.7,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        try:
-            topic_data = json.loads(response.choices[0].message.content)
-            # Ensure required fields exist
-            if "selected_topic" not in topic_data:
-                topic_data["selected_topic"] = "AI Development Tools Evolution"
-            if "angle" not in topic_data:
-                topic_data["angle"] = "How recent tools are changing development workflows"
-            return topic_data
-        except:
-            return {
-                "selected_topic": "AI Development Tools Evolution",
-                "angle": "How recent tools are changing development workflows"
-            }
-    
-    async def _craft_premium_editorial(
-        self, 
-        user_analysis: dict, 
-        topic_selection: dict,
-        research_data: dict
-    ) -> Dict[str, str]:
-        """Craft premium editorial content"""
-        
-        current_date = datetime.now().strftime("%B %d, %Y")
-        
-        prompt = f"""
-        Write a premium editorial piece using REAL research data and INFERRED user profile.
-        
-        USER PROFILE (INFERRED FROM GITHUB):
-        Name: {user_analysis.get('inferred_skills', [])} developer
-        Skills: {user_analysis.get('inferred_skills', [])}
-        Interests: {user_analysis.get('inferred_interests', [])}
-        Goals: {user_analysis.get('inferred_goals', [])}
-        Experience: {user_analysis.get('experience_level', 'intermediate')} level
-        Domain: {user_analysis.get('primary_domain', 'web_development')}
-        Current Focus: {user_analysis.get('current_focus', 'general development')}
-        
-        TOPIC & ANGLE: {json.dumps(topic_selection)}
-        
-        REAL DATA TO USE:
-        - Fresh Trending Repos: {json.dumps(research_data.get('trending_repos', [])[:8], indent=2)}
-        - Current HN Stories: {json.dumps(research_data.get('hackernews_stories', [])[:8], indent=2)}
-        - User's GitHub Activity: {json.dumps(research_data.get('user_context', {}).get('recent_repos', [])[:5], indent=2)}
-        - User's Interests (from stars): {json.dumps(research_data.get('user_context', {}).get('interests_from_stars', [])[:5], indent=2)}
-        
-        Write like The Information/Stratechery - premium business intelligence:
-        
-        REQUIREMENTS:
-        1. HEADLINE: Compelling, specific (not clickbait)
-        2. STRUCTURE:
-           - Hook with real data point or trend
-           - Context and background
-           - Deep analysis with specific examples
-           - Connection to user's specific GitHub activity and interests
-           - Forward-looking insights
-        3. USE REAL DATA: Reference specific repos, stories, numbers from above
-        4. PERSONAL CONNECTION: Weave in relevance to user's GitHub profile naturally
-        5. LENGTH: 650-800 words
-        6. STYLE: Professional, insightful, worth paying for
-        7. FRESHNESS: Emphasize what's NEW and CURRENT
-        
-        Return as JSON:
-        {{
-            "headline": "Compelling headline",
-            "content": "Full editorial with paragraphs",
-            "key_insights": ["main takeaways"],
-            "data_points_used": ["specific data referenced"]
-        }}
-        
-        Make it feel like premium research they'd be excited to read and share.
-        Focus on what's happening RIGHT NOW in their domain.
-        """
-        
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            max_tokens=3000,
-            temperature=0.8,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        try:
-            content_text = response.choices[0].message.content
-            print(f"🔍 Raw AI response: {content_text[:200]}...")
-            
-            # Try to extract JSON from the response
-            if "```json" in content_text:
-                json_start = content_text.find("```json") + 7
-                json_end = content_text.find("```", json_start)
-                json_text = content_text[json_start:json_end].strip()
-            elif "{" in content_text and "}" in content_text:
-                json_start = content_text.find("{")
-                json_end = content_text.rfind("}") + 1
-                json_text = content_text[json_start:json_end]
-            else:
-                # Fallback: create content from the raw response
-                return {
-                    "headline": "Weekly Tech Intelligence Brief",
-                    "content": content_text,
-                    "key_insights": ["AI-generated insights from current trends"],
-                    "date": current_date,
-                    "data_sources": ["Real-time GitHub and HackerNews data"]
-                }
-            
-            content_data = json.loads(json_text)
-            return {
-                "headline": content_data.get("headline", "Your Weekly Tech Intelligence"),
-                "content": content_data.get("content", "Content generation failed"),
-                "key_insights": content_data.get("key_insights", []),
-                "date": current_date,
-                "data_sources": content_data.get("data_points_used", [])
-            }
-        except Exception as e:
-            print(f"⚠️ Content generation failed: {e}")
-            # Create a meaningful fallback with real data
-            return {
-                "headline": "Weekly Tech Intelligence Brief",
-                "content": f"Based on our analysis of {len(research_data.get('trending_repos', []))} trending repositories and {len(research_data.get('hackernews_stories', []))} HackerNews stories, here are the key developments in your areas of interest: {', '.join(user_analysis.get('inferred_interests', ['technology']))}. Your GitHub activity shows expertise in {', '.join(user_analysis.get('inferred_skills', ['development']))}, and the current trends align perfectly with your focus on {user_analysis.get('current_focus', 'technology innovation')}. The most exciting developments include new tools and frameworks that could enhance your {user_analysis.get('primary_domain', 'development')} workflow.",
-                "key_insights": [
-                    f"Real-time analysis of {len(research_data.get('trending_repos', []))} trending repositories",
-                    f"Current HackerNews discussions and trends", 
-                    f"Personalized insights based on your {user_analysis.get('primary_domain', 'development')} expertise",
-                    f"Fresh data from the last 3 days"
-                ],
-                "date": current_date,
-                "data_sources": ["GitHub API", "HackerNews API", "Real-time analysis"]
-            }
-    
-    def _analyze_geographic_context(self, user_profile: dict) -> dict:
-        """Analyze geographic context for content prioritization"""
-        
-        location = user_profile.get('location', '').lower()
-        
-        context = {
-            'is_india': any(loc in location for loc in ['india', 'bangalore', 'delhi', 'mumbai', 'hyderabad', 'pune']),
-            'is_us': any(loc in location for loc in ['usa', 'us', 'america', 'california', 'new york', 'texas']),
-            'local_focus': user_profile.get('preferences', {}).get('prioritize_local', False),
-            'timezone': user_profile.get('timezone', 'UTC')
-        }
-        
-        return context
-    
-    def _validate_content_quality(self, content: list, user_intent: dict) -> list:
-        """Ensure content meets quality standards with strict validation"""
-        
-        validated_content = []
-        github_references = 0
-        india_references = 0
-        
-        for item in content:
-            # Check if item has required structure
-            if not isinstance(item, dict):
-                print(f"⚠️ Skipping invalid item structure")
-                continue
-                
-            description = item.get('description', '')
-            title = item.get('title', '')
-            word_count = len(description.split())
-            
-            # Check length
-            if word_count < 100:
-                print(f"⚠️ Item too short ({word_count} words). Minimum 120 words.")
-                continue
-            if word_count > 250:
-                print(f"⚠️ Item too long ({word_count} words). Maximum 200 words.")
-                continue
-            
-            # Check personalization
-            if 'you' not in description.lower() and 'your' not in description.lower():
-                print("⚠️ Item not personalized - must reference user directly")
-                continue
-            
-            # Check actionability  
-            if not item.get('url') or item['url'] == '#':
-                print("⚠️ Item missing actionable URL")
-                continue
-            
-            # Check specificity
-            vague_phrases = ['could be', 'might be', 'possibly', 'maybe', 'perhaps']
-            if any(phrase in description.lower() for phrase in vague_phrases):
-                print("⚠️ Item too vague - use specific language")
-                continue
-            
-            # Check for GitHub references
-            current_projects = user_intent.get('current_projects', [])
-            if current_projects:
-                for project in current_projects:
-                    if project.lower() in description.lower() or project.lower() in title.lower():
-                        github_references += 1
-                        break
-            
-            # Check for India-specific content
-            india_keywords = ['bangalore', 'delhi', 'mumbai', 'hyderabad', 'pune', 'india', 'indian', 'razorpay', 'swiggy', 'zomato', 'flipkart', 'paytm']
-            if any(keyword in description.lower() or keyword in title.lower() for keyword in india_keywords):
-                india_references += 1
-            
-            # Check for geographic relevance if user has local focus
-            geo_priorities = user_intent.get('geographic_priorities', {})
-            if geo_priorities.get('local_focus'):
-                location_hints = ['bangalore', 'delhi', 'mumbai', 'india', 'local', 'nearby']
-                if not any(hint in description.lower() for hint in location_hints):
-                    print("⚠️ Item lacks local relevance for user with local focus")
-                    # Don't skip, but note the issue
-            
-            validated_content.append(item)
-        
-        # Strict validation for India users
-        geo_priorities = user_intent.get('geographic_priorities', {})
-        if geo_priorities.get('region') == 'india' and india_references < 2:
-            print(f"❌ REJECTED: Only {india_references} India-specific items for Indian user (minimum 2 required)")
-            return self._create_fallback_items(user_intent)
-        
-        # Strict validation for GitHub references
-        current_projects = user_intent.get('current_projects', [])
-        if current_projects and github_references < 2:
-            print(f"❌ REJECTED: Only {github_references} GitHub references (minimum 2 required)")
-            return self._create_fallback_items(user_intent)
-        
-        if len(validated_content) < 3:
-            print(f"⚠️ Only {len(validated_content)} items passed quality validation. Minimum 3 required.")
-            # Add fallback items if needed
-            validated_content.extend(self._create_fallback_items(user_intent))
-        
-        print(f"✅ Quality validation passed: {len(validated_content)} items, {github_references} GitHub refs, {india_references} India refs")
-        return validated_content[:5]  # Ensure max 5 items
-    
-    def _create_fallback_items(self, user_intent: dict) -> list:
-        """Create fallback items if validation fails"""
-        
-        primary_intent = user_intent.get('primary_intent', 'exploring')
-        
-        fallback_items = [
-            {
-                'title': f'Quick Update for {primary_intent.title()} Focus',
-                'description': f'Based on your current focus on {primary_intent}, here are some relevant opportunities and resources to explore. Your GitHub activity shows active development, which is perfect timing for these recommendations. The tech landscape is rapidly evolving, and staying ahead requires continuous learning and adaptation. Consider joining relevant communities, attending virtual meetups, or contributing to open-source projects in your area of interest. These activities will help you stay current with industry trends and connect with like-minded developers. Look for opportunities that match your skill level and interests, and don\'t hesitate to step outside your comfort zone. Next step: Identify one specific action you can take this week to advance your {primary_intent} goals.',
-                'url': 'https://github.com/trending',
-                'category': '📊 UPDATE',
-                'relevance_score': 7
-            },
-            {
-                'title': 'Learning Resource Recommendation',
-                'description': 'Here are some curated learning resources that match your current skill development needs. Your GitHub profile shows expertise in multiple technologies, and these resources will help you deepen your knowledge and stay current with best practices. The recommended courses and tutorials are specifically chosen based on your recent activity and interests. Focus on hands-on learning through projects rather than just theoretical knowledge. Consider building something new with the technologies you\'re learning to reinforce your understanding. Join online communities and forums related to these technologies to get help and share your progress. Next step: Pick one resource and commit to completing it within the next two weeks.',
-                'url': 'https://github.com/trending',
-                'category': '🧠 LEARNING',
-                'relevance_score': 6
-            }
-        ]
-        
-        return fallback_items
