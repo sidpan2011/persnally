@@ -126,6 +126,6 @@ dmypy.json
 .pyre/
 
 # Node.js (web app)
-web/node_modules/
+node_modules/
 web/.next/
 web/.env.local
