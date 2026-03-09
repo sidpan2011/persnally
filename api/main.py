@@ -3,14 +3,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from routers import digest, github, health, newsletters, preferences, skills, users
+
 from config import FRONTEND_URL
-from routers import health, users, preferences, newsletters, github, skills, digest
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Start digest scheduler on startup
     from services.scheduler import digest_scheduler_loop
+
     task = asyncio.create_task(digest_scheduler_loop())
     yield
     task.cancel()

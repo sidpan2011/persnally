@@ -5,11 +5,12 @@ Runs as a background task in the FastAPI app. Checks hourly for users
 who need a digest based on their configured frequency (daily/weekly)
 and when they last received one.
 """
-import asyncio
-from datetime import datetime, timedelta
-from services.supabase_client import get_service_client
-from services.engine_bridge import run_generation_pipeline
 
+import asyncio
+from datetime import datetime
+
+from services.engine_bridge import run_generation_pipeline
+from services.supabase_client import get_service_client
 
 SCHEDULER_INTERVAL = 3600  # Check every hour
 
@@ -32,9 +33,7 @@ async def check_and_send_digests():
     # interest_snapshots table has: user_id, interest_graph, synced_at
     try:
         snapshots = (
-            client.table("interest_snapshots")
-            .select("user_id, interest_graph, total_signals, synced_at")
-            .execute()
+            client.table("interest_snapshots").select("user_id, interest_graph, total_signals, synced_at").execute()
         )
     except Exception:
         return  # Table might not exist yet
@@ -49,23 +48,11 @@ async def check_and_send_digests():
 
         try:
             # Get user preferences (frequency, email)
-            user = (
-                client.table("users")
-                .select("email, name")
-                .eq("id", user_id)
-                .maybe_single()
-                .execute()
-            )
+            user = client.table("users").select("email, name").eq("id", user_id).maybe_single().execute()
             if not user or not user.data or not user.data.get("email"):
                 continue
 
-            prefs = (
-                client.table("user_preferences")
-                .select("*")
-                .eq("user_id", user_id)
-                .maybe_single()
-                .execute()
-            )
+            prefs = client.table("user_preferences").select("*").eq("user_id", user_id).maybe_single().execute()
             frequency = "daily"
             if prefs and prefs.data:
                 frequency = prefs.data.get("send_frequency", "daily")
@@ -82,9 +69,9 @@ async def check_and_send_digests():
             )
 
             if last_newsletter and last_newsletter.data:
-                last_sent = datetime.fromisoformat(
-                    last_newsletter.data["sent_at"].replace("Z", "+00:00")
-                ).replace(tzinfo=None)
+                last_sent = datetime.fromisoformat(last_newsletter.data["sent_at"].replace("Z", "+00:00")).replace(
+                    tzinfo=None
+                )
                 hours_since = (now - last_sent).total_seconds() / 3600
 
                 if frequency == "daily" and hours_since < 20:  # 20 hours buffer
@@ -111,15 +98,11 @@ async def check_and_send_digests():
 
             print(f"Scheduler: Sending {frequency} digest to {user.data['email']}")
 
-            job = (
-                client.table("generation_jobs")
-                .insert({"user_id": user_id, "status": "pending"})
-                .execute()
-            )
+            job = client.table("generation_jobs").insert({"user_id": user_id, "status": "pending"}).execute()
             job_id = job.data[0]["id"]
 
             # Build user profile from interest graph
-            from routers.digest import _interest_graph_to_profile, _build_research_from_interests
+            from routers.digest import _build_research_from_interests, _interest_graph_to_profile
 
             user_profile = _interest_graph_to_profile(
                 user.data["email"],
@@ -148,14 +131,16 @@ async def check_and_send_digests():
             research_data = _build_research_from_interests(interest_graph, {})
 
             # Fire and forget — run_generation_pipeline handles its own error reporting
-            asyncio.create_task(run_generation_pipeline(
-                user_id=user_id,
-                job_id=job_id,
-                user_profile=user_profile,
-                github_token=github_token,
-                research_data=research_data,
-                newsletter_extra_fields={"source": "scheduled_digest"},
-            ))
+            asyncio.create_task(
+                run_generation_pipeline(
+                    user_id=user_id,
+                    job_id=job_id,
+                    user_profile=user_profile,
+                    github_token=github_token,
+                    research_data=research_data,
+                    newsletter_extra_fields={"source": "scheduled_digest"},
+                )
+            )
 
         except Exception as e:
             print(f"Scheduler: Error processing user {user_id}: {e}")

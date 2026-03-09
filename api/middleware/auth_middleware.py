@@ -1,6 +1,7 @@
-from fastapi import Request, HTTPException
-from services.supabase_client import get_service_client
 import traceback
+
+from fastapi import HTTPException, Request
+from services.supabase_client import get_service_client
 
 
 async def get_current_user(request: Request) -> dict:

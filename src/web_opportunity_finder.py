@@ -2,16 +2,17 @@
 Web Opportunity Finder - Searches the web for current opportunities
 Uses GitHub Search API to find hackathons, jobs, tools, and contribution opportunities
 """
-import httpx
+
 import asyncio
-from typing import List, Dict, Any
-from datetime import datetime
 import json
+from datetime import datetime
+from typing import Any
 
+import httpx
+
+from .cache import cache_get, cache_key, cache_set
 from .config import get_config
-from .cache import cache_get, cache_set, cache_key
 from .topic_utils import expand_terms
-
 
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 GITHUB_ISSUES_URL = "https://api.github.com/search/issues"
@@ -26,14 +27,14 @@ class WebOpportunityFinder:
         if self.github_token:
             self._headers["Authorization"] = f"Bearer {self.github_token}"
 
-    async def find_opportunities(self, user_profile: dict, behavior_data: dict) -> Dict[str, Any]:
+    async def find_opportunities(self, user_profile: dict, behavior_data: dict) -> dict[str, Any]:
         """
         Find real opportunities by searching the web
         Returns categorized opportunities: hackathons, events, tools, job_opportunities
         """
-        location = user_profile.get('location', '')
-        interests = user_profile.get('interests', [])
-        skills = user_profile.get('skills', [])
+        location = user_profile.get("location", "")
+        interests = user_profile.get("interests", [])
+        skills = user_profile.get("skills", [])
 
         # Build search queries based on user profile
         queries = self._build_search_queries(location, interests, skills)
@@ -70,97 +71,107 @@ class WebOpportunityFinder:
                 print(f"[WebFinder] {label} search failed: {r}")
 
         opportunities = {
-            'hackathons': hackathons,
-            'events': events,
-            'tools': tools,
-            'job_opportunities': job_opportunities,
+            "hackathons": hackathons,
+            "events": events,
+            "tools": tools,
+            "job_opportunities": job_opportunities,
         }
 
         total = sum(len(v) for v in opportunities.values())
         print(f"[WebFinder] Found {total} total opportunities")
 
         return {
-            'search_queries': queries,
-            'opportunities': opportunities,
-            'location_hint': location,
-            'interest_hints': interests,
+            "search_queries": queries,
+            "opportunities": opportunities,
+            "location_hint": location,
+            "interest_hints": interests,
         }
 
-    async def _search_hackathons(self, client: httpx.AsyncClient, terms: List[str], year: int) -> List[Dict]:
+    async def _search_hackathons(self, client: httpx.AsyncClient, terms: list[str], year: int) -> list[dict]:
         """Search GitHub for hackathon repos updated recently."""
         results = []
         for term in terms[:2]:
             q = f"hackathon {year} {term}"
             items = await self._github_repo_search(client, q, sort="updated", per_page=5)
             for item in items:
-                results.append({
-                    'title': item['name'],
-                    'description': (item.get('description') or '')[:200],
-                    'url': item['html_url'],
-                    'source': 'github',
-                    'stars': item.get('stargazers_count', 0),
-                    'updated': item.get('updated_at', ''),
-                    'type': 'hackathon',
-                })
+                results.append(
+                    {
+                        "title": item["name"],
+                        "description": (item.get("description") or "")[:200],
+                        "url": item["html_url"],
+                        "source": "github",
+                        "stars": item.get("stargazers_count", 0),
+                        "updated": item.get("updated_at", ""),
+                        "type": "hackathon",
+                    }
+                )
         # Dedupe by url
         return _dedupe(results)
 
-    async def _search_job_repos(self, client: httpx.AsyncClient, terms: List[str]) -> List[Dict]:
+    async def _search_job_repos(self, client: httpx.AsyncClient, terms: list[str]) -> list[dict]:
         """Search GitHub for hiring/job-related repos matching user's stack."""
         results = []
         for term in terms[:2]:
             q = f"hiring {term}"
             items = await self._github_repo_search(client, q, sort="updated", per_page=5)
             for item in items:
-                results.append({
-                    'title': item['name'],
-                    'description': (item.get('description') or '')[:200],
-                    'url': item['html_url'],
-                    'source': 'github',
-                    'stars': item.get('stargazers_count', 0),
-                    'updated': item.get('updated_at', ''),
-                    'type': 'job',
-                })
+                results.append(
+                    {
+                        "title": item["name"],
+                        "description": (item.get("description") or "")[:200],
+                        "url": item["html_url"],
+                        "source": "github",
+                        "stars": item.get("stargazers_count", 0),
+                        "updated": item.get("updated_at", ""),
+                        "type": "job",
+                    }
+                )
         return _dedupe(results)
 
-    async def _search_contribution_opportunities(self, client: httpx.AsyncClient, terms: List[str]) -> List[Dict]:
+    async def _search_contribution_opportunities(self, client: httpx.AsyncClient, terms: list[str]) -> list[dict]:
         """Search GitHub issues labeled good-first-issue matching user's languages."""
         results = []
         for term in terms[:2]:
             q = f"label:good-first-issue language:{term} state:open"
             items = await self._github_issue_search(client, q, sort="created", per_page=5)
             for item in items:
-                results.append({
-                    'title': item.get('title', ''),
-                    'description': (item.get('body') or '')[:200],
-                    'url': item['html_url'],
-                    'source': 'github',
-                    'comments': item.get('comments', 0),
-                    'created': item.get('created_at', ''),
-                    'type': 'contribution',
-                    'labels': [l['name'] for l in item.get('labels', [])[:5]],
-                })
+                results.append(
+                    {
+                        "title": item.get("title", ""),
+                        "description": (item.get("body") or "")[:200],
+                        "url": item["html_url"],
+                        "source": "github",
+                        "comments": item.get("comments", 0),
+                        "created": item.get("created_at", ""),
+                        "type": "contribution",
+                        "labels": [l["name"] for l in item.get("labels", [])[:5]],
+                    }
+                )
         return _dedupe(results)
 
-    async def _search_trending_tools(self, client: httpx.AsyncClient, terms: List[str]) -> List[Dict]:
+    async def _search_trending_tools(self, client: httpx.AsyncClient, terms: list[str]) -> list[dict]:
         """Search GitHub for trending tools/libraries in user's interest areas."""
         results = []
         for term in terms[:2]:
             q = f"{term} tool"
             items = await self._github_repo_search(client, q, sort="stars", per_page=5)
             for item in items:
-                results.append({
-                    'title': item['name'],
-                    'description': (item.get('description') or '')[:200],
-                    'url': item['html_url'],
-                    'source': 'github',
-                    'stars': item.get('stargazers_count', 0),
-                    'updated': item.get('updated_at', ''),
-                    'type': 'tool',
-                })
+                results.append(
+                    {
+                        "title": item["name"],
+                        "description": (item.get("description") or "")[:200],
+                        "url": item["html_url"],
+                        "source": "github",
+                        "stars": item.get("stargazers_count", 0),
+                        "updated": item.get("updated_at", ""),
+                        "type": "tool",
+                    }
+                )
         return _dedupe(results)
 
-    async def _github_repo_search(self, client: httpx.AsyncClient, q: str, sort: str = "updated", per_page: int = 5) -> List[Dict]:
+    async def _github_repo_search(
+        self, client: httpx.AsyncClient, q: str, sort: str = "updated", per_page: int = 5
+    ) -> list[dict]:
         """Execute a GitHub repository search. Returns list of repo items."""
         ck = cache_key("wf_repo_search", q, sort, str(per_page))
         cached = cache_get(ck)
@@ -177,7 +188,9 @@ class WebOpportunityFinder:
             print(f"[WebFinder] GitHub repo search failed for '{q}': {e}")
             return []
 
-    async def _github_issue_search(self, client: httpx.AsyncClient, q: str, sort: str = "created", per_page: int = 5) -> List[Dict]:
+    async def _github_issue_search(
+        self, client: httpx.AsyncClient, q: str, sort: str = "created", per_page: int = 5
+    ) -> list[dict]:
         """Execute a GitHub issue search. Returns list of issue items."""
         ck = cache_key("wf_issue_search", q, sort, str(per_page))
         cached = cache_get(ck)
@@ -194,7 +207,7 @@ class WebOpportunityFinder:
             print(f"[WebFinder] GitHub issue search failed for '{q}': {e}")
             return []
 
-    def _build_search_queries(self, location: str, interests: List[str], skills: List[str]) -> List[str]:
+    def _build_search_queries(self, location: str, interests: list[str], skills: list[str]) -> list[str]:
         """Build targeted search queries - GLOBAL first, local second"""
 
         queries = []
@@ -213,19 +226,19 @@ class WebOpportunityFinder:
 
         # Location-based queries (secondary - only 2-3)
         if location:
-            city = location.split(',')[0].strip()
+            city = location.split(",")[0].strip()
             queries.append(f"{city} tech events {current_month}")
             queries.append(f"{location} hackathon {current_month}")
 
         return queries
 
 
-def _dedupe(items: List[Dict]) -> List[Dict]:
+def _dedupe(items: list[dict]) -> list[dict]:
     """Remove duplicates by url."""
     seen = set()
     out = []
     for item in items:
-        url = item.get('url', '')
+        url = item.get("url", "")
         if url not in seen:
             seen.add(url)
             out.append(item)

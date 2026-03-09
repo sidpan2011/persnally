@@ -56,10 +56,6 @@ async def connect_github(body: dict, user: dict = Depends(get_current_user)):
     }
 
     # Upsert
-    result = (
-        client.table("connected_accounts")
-        .upsert(data, on_conflict="user_id,provider")
-        .execute()
-    )
+    result = client.table("connected_accounts").upsert(data, on_conflict="user_id,provider").execute()
 
     return {"connected": True, "username": data["username"]}

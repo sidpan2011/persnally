@@ -2,9 +2,11 @@
 Engine Bridge - Connects the FastAPI layer to the existing Persnally engine.
 Constructs user_profile dicts from Supabase data and runs the generation pipeline.
 """
+
 import asyncio
 import hashlib
 from datetime import datetime
+
 from services.supabase_client import get_service_client
 
 PIPELINE_TIMEOUT_SECONDS = 120
@@ -31,35 +33,46 @@ async def run_generation_pipeline(
 
     try:
         # Mark job as running (before timeout wrapper so user sees it started)
-        client.table("generation_jobs").update({
-            "status": "running",
-            "started_at": datetime.utcnow().isoformat(),
-        }).eq("id", job_id).execute()
+        client.table("generation_jobs").update(
+            {
+                "status": "running",
+                "started_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("id", job_id).execute()
 
         # Run the core pipeline with a timeout
         await asyncio.wait_for(
             _run_pipeline_inner(
-                client, user_id, job_id, user_profile, github_token,
-                research_data, newsletter_extra_fields,
+                client,
+                user_id,
+                job_id,
+                user_profile,
+                github_token,
+                research_data,
+                newsletter_extra_fields,
             ),
             timeout=PIPELINE_TIMEOUT_SECONDS,
         )
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         # Pipeline took too long – mark job as failed
-        client.table("generation_jobs").update({
-            "status": "failed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "error": f"Pipeline timed out after {PIPELINE_TIMEOUT_SECONDS} seconds",
-        }).eq("id", job_id).execute()
+        client.table("generation_jobs").update(
+            {
+                "status": "failed",
+                "completed_at": datetime.utcnow().isoformat(),
+                "error": f"Pipeline timed out after {PIPELINE_TIMEOUT_SECONDS} seconds",
+            }
+        ).eq("id", job_id).execute()
 
     except Exception as e:
         # Mark job failed
-        client.table("generation_jobs").update({
-            "status": "failed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "error": str(e)[:500],
-        }).eq("id", job_id).execute()
+        client.table("generation_jobs").update(
+            {
+                "status": "failed",
+                "completed_at": datetime.utcnow().isoformat(),
+                "error": str(e)[:500],
+            }
+        ).eq("id", job_id).execute()
 
 
 async def _run_pipeline_inner(
@@ -73,10 +86,10 @@ async def _run_pipeline_inner(
 ):
     """Core pipeline logic executed under the timeout wrapper."""
     # Import engine components (lazy to avoid import issues at module level)
-    from src.config import Config
-    from src.mcp_clients.resend_client import MCPResendClient
     from src.ai_engine import AIEditorialEngine
+    from src.config import Config
     from src.email_sender import PremiumEmailSender
+    from src.mcp_clients.resend_client import MCPResendClient
     from src.system_prompts import LOCATION_RULES
 
     # Create config, override github token for this user
@@ -93,6 +106,7 @@ async def _run_pipeline_inner(
     # Gather research if not provided
     if research_data is None:
         from data_sources.web_research import WebResearchAggregator
+
         web_research = WebResearchAggregator(github_token or config.GITHUB_TOKEN)
         research_data = await web_research.gather_comprehensive_research_with_opportunities(user_profile)
         if not research_data:
@@ -102,9 +116,7 @@ async def _run_pipeline_inner(
     location = user_profile.get("location", "")
     location_rule = LOCATION_RULES.get("India" if "india" in location.lower() else "default")
 
-    daily_5_content = await ai_engine.generate_daily_5(
-        user_profile, research_data, location_rule=location_rule
-    )
+    daily_5_content = await ai_engine.generate_daily_5(user_profile, research_data, location_rule=location_rule)
 
     # Render HTML
     html_content = email_sender._generate_daily_5_email_html(user_profile, daily_5_content)
@@ -130,25 +142,27 @@ async def _run_pipeline_inner(
 
     # Store content hashes for dedup
     for item in daily_5_content.get("items", []):
-        content_hash = hashlib.md5(
-            (item.get("title", "") + item.get("url", "")).encode()
-        ).hexdigest()
+        content_hash = hashlib.md5((item.get("title", "") + item.get("url", "")).encode()).hexdigest()
         try:
-            client.table("content_history").insert({
-                "user_id": user_id,
-                "content_hash": content_hash,
-                "title": item.get("title", ""),
-                "url": item.get("url", ""),
-            }).execute()
+            client.table("content_history").insert(
+                {
+                    "user_id": user_id,
+                    "content_hash": content_hash,
+                    "title": item.get("title", ""),
+                    "url": item.get("url", ""),
+                }
+            ).execute()
         except Exception:
             pass  # Ignore duplicate hash errors
 
     # Mark job complete
-    client.table("generation_jobs").update({
-        "status": "completed",
-        "completed_at": datetime.utcnow().isoformat(),
-        "newsletter_id": newsletter_id,
-    }).eq("id", job_id).execute()
+    client.table("generation_jobs").update(
+        {
+            "status": "completed",
+            "completed_at": datetime.utcnow().isoformat(),
+            "newsletter_id": newsletter_id,
+        }
+    ).eq("id", job_id).execute()
 
 
 async def run_generation_for_user(user_id: str, job_id: str):

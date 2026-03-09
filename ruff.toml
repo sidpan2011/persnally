@@ -1,0 +1,29 @@
+target-version = "py312"
+line-length = 120
+
+[lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "B",     # flake8-bugbear
+    "UP",    # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults (FastAPI Depends)
+    "E722",  # bare except (used intentionally for best-effort patterns)
+    "B904",  # raise from in except (not critical for this codebase)
+    "F841",  # unused local variable (some exist in complex pipelines)
+    "E741",  # ambiguous variable name
+    "B007",  # unused loop variable (used for iteration count)
+    "B905",  # zip strict param (not needed for our use cases)
+    "B023",  # function binding loop variable
+]
+
+[lint.per-file-ignores]
+"test_*.py" = ["F841"]  # unused variables ok in tests
+
+[format]
+quote-style = "double"

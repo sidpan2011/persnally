@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends
 import traceback
+
+from fastapi import APIRouter, Depends
 from middleware.auth_middleware import get_current_user
 from models.schemas import PreferencesUpdate
 from services.supabase_client import get_service_client

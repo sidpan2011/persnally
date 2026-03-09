@@ -1,9 +1,10 @@
 import traceback
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from middleware.auth_middleware import get_current_user
 from models.schemas import GenerateResponse, JobStatus
-from services.supabase_client import get_service_client
 from services.engine_bridge import run_generation_for_user
+from services.supabase_client import get_service_client
 
 router = APIRouter(prefix="/newsletters", tags=["newsletters"])
 
@@ -20,11 +21,13 @@ async def list_newsletters(user: dict = Depends(get_current_user), limit: int = 
         .execute()
     )
     newsletters = []
-    for n in (result.data if result and result.data else []):
-        newsletters.append({
-            **n,
-            "item_count": len(n.get("items", [])),
-        })
+    for n in result.data if result and result.data else []:
+        newsletters.append(
+            {
+                **n,
+                "item_count": len(n.get("items", [])),
+            }
+        )
     return newsletters
 
 
@@ -33,12 +36,7 @@ async def get_job_status(job_id: str, user: dict = Depends(get_current_user)):
     client = get_service_client()
     try:
         result = (
-            client.table("generation_jobs")
-            .select("*")
-            .eq("id", job_id)
-            .eq("user_id", user["id"])
-            .single()
-            .execute()
+            client.table("generation_jobs").select("*").eq("id", job_id).eq("user_id", user["id"]).single().execute()
         )
     except Exception:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -76,11 +74,7 @@ async def generate_newsletter(background_tasks: BackgroundTasks, user: dict = De
             return GenerateResponse(job_id=running.data["id"], status="already_running")
 
         # Create job
-        job = (
-            client.table("generation_jobs")
-            .insert({"user_id": user["id"], "status": "pending"})
-            .execute()
-        )
+        job = client.table("generation_jobs").insert({"user_id": user["id"], "status": "pending"}).execute()
         job_id = job.data[0]["id"]
 
         # Run in background
@@ -98,12 +92,7 @@ async def get_newsletter(newsletter_id: str, user: dict = Depends(get_current_us
     client = get_service_client()
     try:
         result = (
-            client.table("newsletters")
-            .select("*")
-            .eq("id", newsletter_id)
-            .eq("user_id", user["id"])
-            .single()
-            .execute()
+            client.table("newsletters").select("*").eq("id", newsletter_id).eq("user_id", user["id"]).single().execute()
         )
     except Exception:
         raise HTTPException(status_code=404, detail="Newsletter not found")

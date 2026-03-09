@@ -1,9 +1,11 @@
 """Skills API - Skill map, gap analysis, and career intelligence."""
+
 import traceback
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from middleware.auth_middleware import get_current_user
-from services.supabase_client import get_service_client
 from services.career_bridge import run_skill_analysis
+from services.supabase_client import get_service_client
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -32,7 +34,9 @@ async def get_skill_history(user: dict = Depends(get_current_user), limit: int =
     client = get_service_client()
     result = (
         client.table("skill_snapshots")
-        .select("id, snapshot_date, skills, languages, domains, experience_level, career_stage, specialization, summary")
+        .select(
+            "id, snapshot_date, skills, languages, domains, experience_level, career_stage, specialization, summary"
+        )
         .eq("user_id", user["id"])
         .order("snapshot_date", desc=True)
         .limit(limit)
@@ -126,14 +130,7 @@ async def get_analysis_status(job_id: str, user: dict = Depends(get_current_user
     """Check the status of a skill analysis job."""
     client = get_service_client()
     try:
-        result = (
-            client.table("analysis_jobs")
-            .select("*")
-            .eq("id", job_id)
-            .eq("user_id", user["id"])
-            .single()
-            .execute()
-        )
+        result = client.table("analysis_jobs").select("*").eq("id", job_id).eq("user_id", user["id"]).single().execute()
     except Exception:
         raise HTTPException(status_code=404, detail="Job not found")
     if not result or not result.data:

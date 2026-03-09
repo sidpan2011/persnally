@@ -1,0 +1,26 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - FRONTEND_URL=http://localhost:3000
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped

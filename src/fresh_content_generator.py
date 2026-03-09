@@ -2,12 +2,15 @@
 Fresh Content Generator - Fetches live content from GitHub and HackerNews
 Matches results to user interests for personalized daily digests
 """
-import httpx
+
 import asyncio
-from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+from typing import Any
+
+import httpx
+
+from .cache import cache_get, cache_key, cache_set
 from .config import get_config
-from .cache import cache_get, cache_set, cache_key
 from .topic_utils import expand_terms, relevance_score
 
 
@@ -19,7 +22,7 @@ class FreshContentGenerator:
         if self.github_token:
             self._github_headers["Authorization"] = f"Bearer {self.github_token}"
 
-    async def generate_fresh_daily_5(self, user_profile: dict) -> List[Dict[str, Any]]:
+    async def generate_fresh_daily_5(self, user_profile: dict) -> list[dict[str, Any]]:
         """Generate 5 pieces of genuinely fresh, well-written content.
 
         If the user_profile contains an interest_graph (from MCP digest flow),
@@ -52,7 +55,7 @@ class FreshContentGenerator:
 
         return daily_5
 
-    async def generate_from_interest_graph(self, user_profile: dict) -> List[Dict[str, Any]]:
+    async def generate_from_interest_graph(self, user_profile: dict) -> list[dict[str, Any]]:
         """Generate content driven by the MCP interest graph.
 
         Extracts the top 5 topics by weight and uses them as targeted search
@@ -67,9 +70,7 @@ class FreshContentGenerator:
 
         topics = interest_graph.get("topics", [])
         if not topics:
-            return await self.generate_fresh_daily_5(
-                {k: v for k, v in user_profile.items() if k != "interest_graph"}
-            )
+            return await self.generate_fresh_daily_5({k: v for k, v in user_profile.items() if k != "interest_graph"})
 
         # Top 5 topics by weight
         sorted_topics = sorted(topics, key=lambda t: t.get("weight", 0), reverse=True)[:5]
@@ -91,9 +92,7 @@ class FreshContentGenerator:
         gh_learning_coro = self._fetch_github_learning(interests)
         gh_opportunity_coro = self._fetch_github_opportunity(interests)
 
-        results = await asyncio.gather(
-            hn_coro, gh_learning_coro, gh_opportunity_coro, *gh_trending_coros
-        )
+        results = await asyncio.gather(hn_coro, gh_learning_coro, gh_opportunity_coro, *gh_trending_coros)
 
         hn_stories = results[0]
         gh_learning = results[1]
@@ -102,7 +101,7 @@ class FreshContentGenerator:
 
         # Merge all targeted GitHub results, de-duplicate by repo id
         seen_ids = set()
-        gh_trending_merged: List[Dict[str, Any]] = []
+        gh_trending_merged: list[dict[str, Any]] = []
         for repo_list in gh_trending_lists:
             for repo in repo_list:
                 rid = repo.get("id")
@@ -112,10 +111,7 @@ class FreshContentGenerator:
 
         # Filter HN stories to those matching any interest-graph topic keyword (with synonym expansion)
         topic_keywords = set(expand_terms([kw for q in top_queries for kw in q.split()]))
-        filtered_hn = [
-            s for s in hn_stories
-            if any(kw in s.get("title", "").lower() for kw in topic_keywords)
-        ]
+        filtered_hn = [s for s in hn_stories if any(kw in s.get("title", "").lower() for kw in topic_keywords)]
         # Fall back to full list if filter is too aggressive
         if len(filtered_hn) < 5:
             filtered_hn = hn_stories
@@ -132,7 +128,7 @@ class FreshContentGenerator:
 
     # ── Data fetching ─────────────────────────────────────────────
 
-    async def _fetch_hn_top_stories(self, limit: int = 30) -> List[Dict[str, Any]]:
+    async def _fetch_hn_top_stories(self, limit: int = 30) -> list[dict[str, Any]]:
         """Fetch top HackerNews stories with details."""
         ck = cache_key("hn_top_stories", str(limit))
         cached = cache_get(ck)
@@ -141,18 +137,11 @@ class FreshContentGenerator:
             return cached
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    "https://hacker-news.firebaseio.com/v0/topstories.json"
-                )
+                resp = await client.get("https://hacker-news.firebaseio.com/v0/topstories.json")
                 resp.raise_for_status()
                 story_ids = resp.json()[:limit]
 
-                tasks = [
-                    client.get(
-                        f"https://hacker-news.firebaseio.com/v0/item/{sid}.json"
-                    )
-                    for sid in story_ids
-                ]
+                tasks = [client.get(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json") for sid in story_ids]
                 responses = await asyncio.gather(*tasks, return_exceptions=True)
 
                 stories = []
@@ -168,9 +157,7 @@ class FreshContentGenerator:
             print(f"HackerNews fetch failed: {e}")
             return []
 
-    async def _fetch_github_trending(
-        self, interests: List[str], query: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    async def _fetch_github_trending(self, interests: list[str], query: str | None = None) -> list[dict[str, Any]]:
         """Fetch trending GitHub repos.
 
         When *query* is provided (interest-graph mode), search for that
@@ -189,29 +176,20 @@ class FreshContentGenerator:
             search_q += f" {interests[0]}"
         return await self._github_search(search_q, sort="stars")
 
-    async def _fetch_github_learning(
-        self, interests: List[str]
-    ) -> List[Dict[str, Any]]:
+    async def _fetch_github_learning(self, interests: list[str]) -> list[dict[str, Any]]:
         """Fetch repos with learning/tutorial signals."""
         keywords = ["tutorial", "learn", "course", "awesome", "guide"]
         interest_part = interests[0] if interests else "programming"
         query = f"{interest_part} " + " OR ".join(keywords) + " in:name,description"
         return await self._github_search(query, sort="updated")
 
-    async def _fetch_github_opportunity(
-        self, interests: List[str]
-    ) -> List[Dict[str, Any]]:
+    async def _fetch_github_opportunity(self, interests: list[str]) -> list[dict[str, Any]]:
         """Fetch repos with contribution/hiring signals."""
         interest_part = interests[0] if interests else "opensource"
-        query = (
-            f"{interest_part} (good-first-issue OR help-wanted OR hiring OR contribute)"
-            " in:name,description,topics"
-        )
+        query = f"{interest_part} (good-first-issue OR help-wanted OR hiring OR contribute) in:name,description,topics"
         return await self._github_search(query, sort="updated")
 
-    async def _github_search(
-        self, query: str, sort: str = "stars", limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    async def _github_search(self, query: str, sort: str = "stars", limit: int = 10) -> list[dict[str, Any]]:
         """Run a GitHub search/repositories query."""
         ck = cache_key("gh_search", query, sort, str(limit))
         cached = cache_get(ck)
@@ -241,7 +219,7 @@ class FreshContentGenerator:
     # ── Interest matching ─────────────────────────────────────────
 
     @staticmethod
-    def _relevance_score(text: str, interests: List[str]) -> int:
+    def _relevance_score(text: str, interests: list[str]) -> int:
         """Relevance score using synonym expansion.
 
         Direct keyword match = 2 points, synonym match = 1 point.
@@ -249,8 +227,8 @@ class FreshContentGenerator:
         return relevance_score(text, interests)
 
     def _best_hn_match(
-        self, stories: List[Dict[str, Any]], interests: List[str], exclude_ids: set = None
-    ) -> Optional[Dict[str, Any]]:
+        self, stories: list[dict[str, Any]], interests: list[str], exclude_ids: set = None
+    ) -> dict[str, Any] | None:
         """Return the HN story most relevant to interests."""
         if not stories:
             return None
@@ -265,9 +243,7 @@ class FreshContentGenerator:
         scored.sort(key=lambda x: (-x[0], -x[1].get("score", 0)))
         return scored[0][1] if scored else None
 
-    def _best_gh_match(
-        self, repos: List[Dict[str, Any]], interests: List[str]
-    ) -> Optional[Dict[str, Any]]:
+    def _best_gh_match(self, repos: list[dict[str, Any]], interests: list[str]) -> dict[str, Any] | None:
         """Return the GitHub repo most relevant to interests."""
         if not repos:
             return None
@@ -281,9 +257,7 @@ class FreshContentGenerator:
 
     # ── Slot builders ─────────────────────────────────────────────
 
-    def _build_breaking(
-        self, hn_stories: List[Dict[str, Any]], interests: List[str]
-    ) -> Dict[str, Any]:
+    def _build_breaking(self, hn_stories: list[dict[str, Any]], interests: list[str]) -> dict[str, Any]:
         """BREAKING — top HN story matching interests."""
         story = self._best_hn_match(hn_stories, interests)
         if not story:
@@ -309,9 +283,7 @@ class FreshContentGenerator:
             "meta_info": f"{points} points | {comments} comments | HackerNews",
         }
 
-    def _build_trending(
-        self, gh_repos: List[Dict[str, Any]], interests: List[str]
-    ) -> Dict[str, Any]:
+    def _build_trending(self, gh_repos: list[dict[str, Any]], interests: list[str]) -> dict[str, Any]:
         """TRENDING — hot GitHub repo."""
         repo = self._best_gh_match(gh_repos, interests)
         if not repo:
@@ -339,9 +311,7 @@ class FreshContentGenerator:
             "meta_info": f"{stars:,} stars | {lang} | Created {created}",
         }
 
-    def _build_opportunity(
-        self, gh_repos: List[Dict[str, Any]], interests: List[str]
-    ) -> Dict[str, Any]:
+    def _build_opportunity(self, gh_repos: list[dict[str, Any]], interests: list[str]) -> dict[str, Any]:
         """OPPORTUNITY — repo with contribution/hiring signals."""
         repo = self._best_gh_match(gh_repos, interests)
         if not repo:
@@ -373,9 +343,7 @@ class FreshContentGenerator:
             "meta_info": f"{stars:,} stars | {issues} open issues | {lang}",
         }
 
-    def _build_learn(
-        self, gh_repos: List[Dict[str, Any]], interests: List[str]
-    ) -> Dict[str, Any]:
+    def _build_learn(self, gh_repos: list[dict[str, Any]], interests: list[str]) -> dict[str, Any]:
         """LEARN — educational/tutorial repo."""
         repo = self._best_gh_match(gh_repos, interests)
         if not repo:
@@ -405,9 +373,7 @@ class FreshContentGenerator:
             "meta_info": f"{stars:,} stars | {lang} | Learning resource",
         }
 
-    def _build_insight(
-        self, hn_stories: List[Dict[str, Any]], interests: List[str]
-    ) -> Dict[str, Any]:
+    def _build_insight(self, hn_stories: list[dict[str, Any]], interests: list[str]) -> dict[str, Any]:
         """INSIGHT — HN story about industry trends (avoid duplicating BREAKING pick)."""
         # Pick second-best match to avoid duplicating the BREAKING slot
         best = self._best_hn_match(hn_stories, interests)
@@ -447,7 +413,7 @@ class FreshContentGenerator:
     # ── Fallback ──────────────────────────────────────────────────
 
     @staticmethod
-    def _fallback(category: str, source: str, url: str) -> Dict[str, Any]:
+    def _fallback(category: str, source: str, url: str) -> dict[str, Any]:
         """Honest fallback when an API call fails or returns no results."""
         return {
             "category": category,

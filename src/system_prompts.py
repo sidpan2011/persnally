@@ -259,19 +259,19 @@ Generate 5 diverse items from different sources.
 """
 
 LOCATION_RULES = {
-    'India': {
-        'timezone': 'Asia/Kolkata',
-        'content_preferences': ['India-specific tech news', 'Local startup ecosystem', 'Regional developer events'],
-        'minimum_india_content': 0  # Optional, not required
+    "India": {
+        "timezone": "Asia/Kolkata",
+        "content_preferences": ["India-specific tech news", "Local startup ecosystem", "Regional developer events"],
+        "minimum_india_content": 0,  # Optional, not required
     },
-    'US': {
-        'timezone': 'America/New_York',
-        'content_preferences': ['US tech news', 'Silicon Valley updates', 'US developer events'],
-        'minimum_us_content': 0
+    "US": {
+        "timezone": "America/New_York",
+        "content_preferences": ["US tech news", "Silicon Valley updates", "US developer events"],
+        "minimum_us_content": 0,
     },
-    'default': {
-        'timezone': 'UTC',
-        'content_preferences': ['Global tech news', 'International events'],
-        'minimum_local_content': 0
-    }
+    "default": {
+        "timezone": "UTC",
+        "content_preferences": ["Global tech news", "International events"],
+        "minimum_local_content": 0,
+    },
 }

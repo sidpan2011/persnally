@@ -2,8 +2,9 @@
 Content Formatter - Visual Enhancement for Email Content
 Automatically highlights important information (dates, numbers, costs, repos)
 """
+
 import re
-from typing import List
+
 
 class ContentFormatter:
     """Formats content to highlight important information visually"""
@@ -12,10 +13,10 @@ class ContentFormatter:
     def format_content(content: str, active_repos: list = None) -> str:
         """
         Simple content formatter - now relies on LLM-generated markdown highlighting.
-        
+
         The LLM is instructed to use **bold markdown** for important information:
         - Company names, financial figures, key metrics, dates, etc.
-        
+
         This method now just handles basic repository highlighting if needed.
 
         Args:
@@ -34,12 +35,16 @@ class ContentFormatter:
         if active_repos:
             for repo in active_repos:
                 # Only highlight if not already in **bold** markdown
-                repo_pattern = r'\b' + re.escape(repo) + r'\b'
+                repo_pattern = r"\b" + re.escape(repo) + r"\b"
                 formatted = re.sub(
                     repo_pattern,
-                    lambda m: m.group(0) if '**' in formatted[max(0, m.start()-10):m.start()+10] else f'**{m.group(0)}**',
+                    lambda m: (
+                        m.group(0)
+                        if "**" in formatted[max(0, m.start() - 10) : m.start() + 10]
+                        else f"**{m.group(0)}**"
+                    ),
                     formatted,
-                    flags=re.IGNORECASE
+                    flags=re.IGNORECASE,
                 )
 
         return formatted
