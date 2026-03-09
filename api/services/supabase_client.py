@@ -1,5 +1,5 @@
-from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
+from config import SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL
+from supabase import Client, create_client
 
 
 def get_service_client() -> Client:

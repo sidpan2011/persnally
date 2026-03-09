@@ -2,10 +2,13 @@
 Clean Configuration Management
 Real environment variables only
 """
+
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
+
 
 class Config:
     # Required API Keys
@@ -27,8 +30,10 @@ class Config:
         if not self.GITHUB_TOKEN:
             print("⚠️ GITHUB_TOKEN not found - GitHub API will be rate limited")
 
+
 # Global config instance
 config = Config()
+
 
 def get_config() -> Config:
     """Get application configuration"""

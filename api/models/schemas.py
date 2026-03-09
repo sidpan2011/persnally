@@ -1,6 +1,4 @@
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
 
 
 class PreferencesUpdate(BaseModel):
@@ -15,9 +13,9 @@ class PreferencesUpdate(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    avatar_url: Optional[str] = None
-    onboarded: Optional[bool] = None
+    name: str | None = None
+    avatar_url: str | None = None
+    onboarded: bool | None = None
 
 
 class NewsletterSummary(BaseModel):
@@ -25,7 +23,7 @@ class NewsletterSummary(BaseModel):
     subject: str
     headline: str
     status: str
-    quality_score: Optional[float] = None
+    quality_score: float | None = None
     sent_at: str
     item_count: int = 0
 
@@ -38,6 +36,6 @@ class GenerateResponse(BaseModel):
 class JobStatus(BaseModel):
     id: str
     status: str
-    newsletter_id: Optional[str] = None
-    error: Optional[str] = None
+    newsletter_id: str | None = None
+    error: str | None = None
     created_at: str

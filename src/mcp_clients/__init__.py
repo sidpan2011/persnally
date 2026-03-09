@@ -5,4 +5,4 @@ Contains all MCP client implementations
 
 from .resend_client import MCPResendClient
 
-__all__ = ['MCPResendClient']
+__all__ = ["MCPResendClient"]

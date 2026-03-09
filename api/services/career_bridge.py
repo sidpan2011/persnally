@@ -2,7 +2,9 @@
 Career Bridge - Connects the FastAPI layer to the Skill Analyzer engine.
 Follows the same pattern as engine_bridge.py.
 """
+
 from datetime import datetime
+
 from services.supabase_client import get_service_client
 
 
@@ -12,10 +14,12 @@ async def run_skill_analysis(user_id: str, job_id: str):
 
     try:
         # Mark job as running
-        client.table("analysis_jobs").update({
-            "status": "running",
-            "started_at": datetime.utcnow().isoformat(),
-        }).eq("id", job_id).execute()
+        client.table("analysis_jobs").update(
+            {
+                "status": "running",
+                "started_at": datetime.utcnow().isoformat(),
+            }
+        ).eq("id", job_id).execute()
 
         # Fetch user data
         user_row = client.table("users").select("*").eq("id", user_id).single().execute()
@@ -100,33 +104,39 @@ async def run_skill_analysis(user_id: str, job_id: str):
             client.table("skill_gaps").delete().eq("user_id", user_id).eq("status", "identified").execute()
 
             for gap in skill_gaps:
-                client.table("skill_gaps").insert({
-                    "user_id": user_id,
-                    "skill_name": gap["skill_name"],
-                    "current_level": gap.get("current_level", 0),
-                    "market_demand": gap.get("market_demand", 0),
-                    "gap_score": gap.get("gap_score", 0),
-                    "reason": gap.get("reason", ""),
-                    "category": gap.get("category", "recommended"),
-                    "snapshot_id": snapshot_id,
-                }).execute()
+                client.table("skill_gaps").insert(
+                    {
+                        "user_id": user_id,
+                        "skill_name": gap["skill_name"],
+                        "current_level": gap.get("current_level", 0),
+                        "market_demand": gap.get("market_demand", 0),
+                        "gap_score": gap.get("gap_score", 0),
+                        "reason": gap.get("reason", ""),
+                        "category": gap.get("category", "recommended"),
+                        "snapshot_id": snapshot_id,
+                    }
+                ).execute()
 
         # Mark job complete
-        client.table("analysis_jobs").update({
-            "status": "completed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "result_summary": {
-                "skills_count": len(snapshot.get("skills", {})),
-                "frameworks_count": len(snapshot.get("frameworks", [])),
-                "gaps_count": len(skill_gaps),
-                "specialization": snapshot.get("specialization", ""),
-            },
-        }).eq("id", job_id).execute()
+        client.table("analysis_jobs").update(
+            {
+                "status": "completed",
+                "completed_at": datetime.utcnow().isoformat(),
+                "result_summary": {
+                    "skills_count": len(snapshot.get("skills", {})),
+                    "frameworks_count": len(snapshot.get("frameworks", [])),
+                    "gaps_count": len(skill_gaps),
+                    "specialization": snapshot.get("specialization", ""),
+                },
+            }
+        ).eq("id", job_id).execute()
 
     except Exception as e:
         # Mark job failed
-        client.table("analysis_jobs").update({
-            "status": "failed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "error": str(e)[:500],
-        }).eq("id", job_id).execute()
+        client.table("analysis_jobs").update(
+            {
+                "status": "failed",
+                "completed_at": datetime.utcnow().isoformat(),
+                "error": str(e)[:500],
+            }
+        ).eq("id", job_id).execute()

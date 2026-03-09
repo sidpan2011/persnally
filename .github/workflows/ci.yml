@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── MCP Server (TypeScript) ─────────────────────
+  mcp-server:
+    name: MCP Server — Lint, Build, Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp_server/persnally
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp_server/persnally/package-lock.json
+
+      - run: npm ci
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: E2E test
+        run: npm test
+
+  # ── API (Python) ────────────────────────────────
+  api:
+    name: API — Lint, Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install ruff mypy
+
+      - name: Ruff lint
+        run: ruff check src/ api/
+
+      - name: Ruff format check
+        run: ruff format --check src/ api/
+
+  # ── Web (Next.js) ──────────────────────────────
+  web:
+    name: Web — Lint, Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+
+  # ── Docker Build ────────────────────────────────
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f api/Dockerfile -t persnally-api .
+
+      - name: Build Web image
+        run: docker build -f web/Dockerfile -t persnally-web .

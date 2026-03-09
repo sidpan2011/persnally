@@ -12,18 +12,17 @@ and triggers the full pipeline: research → AI curation → validation → Rese
 
 import hashlib
 from datetime import datetime
-from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
-
-from services.supabase_client import get_service_client
 from services.engine_bridge import run_generation_pipeline
+from services.supabase_client import get_service_client
 
 router = APIRouter(prefix="/digest", tags=["digest"])
 
 
 # ── Request/Response Models ──────────────────────────────────────
+
 
 class TopicInput(BaseModel):
     topic: str
@@ -35,6 +34,7 @@ class TopicInput(BaseModel):
 
 class DigestRequest(BaseModel):
     """Payload from MCP server's persnally_digest tool."""
+
     email: str
     interest_graph: dict  # { topics: [...], categories: {...}, total_signals: int }
     balanced_allocation: dict  # { category: { allocation: int, topics: [...] } }
@@ -43,6 +43,7 @@ class DigestRequest(BaseModel):
 
 class SyncRequest(BaseModel):
     """Lightweight sync — MCP server pushes interest graph updates."""
+
     email: str
     interest_graph: dict
     total_signals: int = 0
@@ -55,7 +56,8 @@ class DigestResponse(BaseModel):
 
 # ── API Key auth (for MCP server) ──────────────────────────────────
 
-async def verify_api_key_or_user(request: Request, x_api_key: Optional[str] = Header(None)):
+
+async def verify_api_key_or_user(request: Request, x_api_key: str | None = Header(None)):
     """Allow either Supabase JWT or API key auth."""
     # Try API key first (MCP server flow)
     if x_api_key:
@@ -94,6 +96,7 @@ async def verify_api_key_or_user(request: Request, x_api_key: Optional[str] = He
 
 # ── Digest Generation Endpoint ──────────────────────────────────
 
+
 @router.post("/generate", response_model=DigestResponse)
 async def generate_digest(
     payload: DigestRequest,
@@ -124,21 +127,19 @@ async def generate_digest(
         pass
 
     # Create job
-    job = (
-        client.table("generation_jobs")
-        .insert({"user_id": user["id"], "status": "pending"})
-        .execute()
-    )
+    job = client.table("generation_jobs").insert({"user_id": user["id"], "status": "pending"}).execute()
     job_id = job.data[0]["id"]
 
     # Store interest graph snapshot for this digest
     try:
-        client.table("interest_snapshots").insert({
-            "user_id": user["id"],
-            "interest_graph": payload.interest_graph,
-            "balanced_allocation": payload.balanced_allocation,
-            "total_signals": payload.interest_graph.get("total_signals", 0),
-        }).execute()
+        client.table("interest_snapshots").insert(
+            {
+                "user_id": user["id"],
+                "interest_graph": payload.interest_graph,
+                "balanced_allocation": payload.balanced_allocation,
+                "total_signals": payload.interest_graph.get("total_signals", 0),
+            }
+        ).execute()
     except Exception:
         pass  # Table might not exist yet, non-critical
 
@@ -190,12 +191,15 @@ async def sync_interest_graph(
     """
     client = get_service_client()
     try:
-        client.table("interest_snapshots").upsert({
-            "user_id": user["id"],
-            "interest_graph": payload.interest_graph,
-            "total_signals": payload.total_signals,
-            "synced_at": datetime.utcnow().isoformat(),
-        }, on_conflict="user_id").execute()
+        client.table("interest_snapshots").upsert(
+            {
+                "user_id": user["id"],
+                "interest_graph": payload.interest_graph,
+                "total_signals": payload.total_signals,
+                "synced_at": datetime.utcnow().isoformat(),
+            },
+            on_conflict="user_id",
+        ).execute()
     except Exception as e:
         # Non-critical — the MCP server still works locally
         print(f"Sync warning: {e}")
@@ -204,6 +208,7 @@ async def sync_interest_graph(
 
 
 # ── Schedule Status ─────────────────────────────────────────────
+
 
 @router.get("/schedule/status")
 async def get_schedule_status(user: dict = Depends(verify_api_key_or_user)):
@@ -220,13 +225,7 @@ async def get_schedule_status(user: dict = Depends(verify_api_key_or_user)):
         .execute()
     )
 
-    prefs = (
-        client.table("user_preferences")
-        .select("send_frequency")
-        .eq("user_id", user["id"])
-        .maybe_single()
-        .execute()
-    )
+    prefs = client.table("user_preferences").select("send_frequency").eq("user_id", user["id"]).maybe_single().execute()
     frequency = prefs.data.get("send_frequency", "daily") if prefs and prefs.data else "daily"
 
     last_sent = last.data["sent_at"] if last and last.data else None
@@ -239,6 +238,7 @@ async def get_schedule_status(user: dict = Depends(verify_api_key_or_user)):
 
 
 # ── Background Digest Generation ────────────────────────────────
+
 
 async def run_interest_digest(
     user_id: str,
@@ -320,7 +320,9 @@ def _interest_graph_to_profile(
 
     # Determine dominant categories for content style
     top_cats = sorted(categories.items(), key=lambda x: x[1], reverse=True)[:3]
-    content_style = "technical_deep_dive" if any(c[0] == "technology" for c in top_cats) else "technical_with_business_context"
+    content_style = (
+        "technical_deep_dive" if any(c[0] == "technology" for c in top_cats) else "technical_with_business_context"
+    )
 
     return {
         "name": email.split("@")[0].replace(".", " ").title(),

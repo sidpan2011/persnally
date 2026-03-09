@@ -8,16 +8,17 @@ Industry-driven approach:
 - Identifies gaps by comparing user stack against market trends
 - Uses Claude only for narrative synthesis, not mechanical analysis
 """
-import asyncio
-import json
-import base64
-import re
-import httpx
-import anthropic
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Tuple
-from collections import defaultdict
 
+import asyncio
+import base64
+import json
+import re
+from collections import defaultdict
+from datetime import UTC, datetime
+from typing import Any
+
+import anthropic
+import httpx
 
 # ============================================================
 # FRAMEWORK DETECTION RULES
@@ -183,19 +184,60 @@ RUST_FRAMEWORK_MAP = {
 
 # Domain classification based on detected technologies
 DOMAIN_SIGNALS = {
-    "frontend": ["React", "Vue.js", "Svelte", "Angular", "Next.js", "Nuxt.js",
-                  "Tailwind CSS", "CSS", "HTML", "Astro", "Remix", "SvelteKit"],
-    "backend": ["Express.js", "FastAPI", "Django", "Flask", "NestJS", "Spring",
-                "Actix Web", "Axum", "Hono", "Fastify", "tRPC"],
-    "ai_ml": ["TensorFlow", "PyTorch", "scikit-learn", "Hugging Face", "LangChain",
-              "OpenAI SDK", "Anthropic SDK", "Vercel AI SDK", "Pandas", "NumPy"],
-    "data_science": ["Pandas", "NumPy", "Jupyter", "R", "Matplotlib", "Plotly",
-                     "BeautifulSoup", "Scrapy"],
-    "devops": ["Docker", "Kubernetes", "Terraform", "AWS SDK", "GitHub Actions",
-               "Ansible", "Jenkins", "Vercel", "Railway", "Netlify"],
+    "frontend": [
+        "React",
+        "Vue.js",
+        "Svelte",
+        "Angular",
+        "Next.js",
+        "Nuxt.js",
+        "Tailwind CSS",
+        "CSS",
+        "HTML",
+        "Astro",
+        "Remix",
+        "SvelteKit",
+    ],
+    "backend": [
+        "Express.js",
+        "FastAPI",
+        "Django",
+        "Flask",
+        "NestJS",
+        "Spring",
+        "Actix Web",
+        "Axum",
+        "Hono",
+        "Fastify",
+        "tRPC",
+    ],
+    "ai_ml": [
+        "TensorFlow",
+        "PyTorch",
+        "scikit-learn",
+        "Hugging Face",
+        "LangChain",
+        "OpenAI SDK",
+        "Anthropic SDK",
+        "Vercel AI SDK",
+        "Pandas",
+        "NumPy",
+    ],
+    "data_science": ["Pandas", "NumPy", "Jupyter", "R", "Matplotlib", "Plotly", "BeautifulSoup", "Scrapy"],
+    "devops": [
+        "Docker",
+        "Kubernetes",
+        "Terraform",
+        "AWS SDK",
+        "GitHub Actions",
+        "Ansible",
+        "Jenkins",
+        "Vercel",
+        "Railway",
+        "Netlify",
+    ],
     "mobile": ["React Native", "Expo", "Flutter", "Swift", "Kotlin", "Capacitor"],
-    "database": ["Prisma", "Drizzle ORM", "Supabase", "Firebase", "MongoDB",
-                 "PostgreSQL", "Redis", "SQLAlchemy"],
+    "database": ["Prisma", "Drizzle ORM", "Supabase", "Firebase", "MongoDB", "PostgreSQL", "Redis", "SQLAlchemy"],
     "systems": ["Rust", "C", "C++", "Go", "Tokio", "WebAssembly"],
     "blockchain": ["Solidity", "Hardhat", "Ethers.js", "Web3.js", "Foundry"],
     "security": ["Burp", "Nmap", "Metasploit", "OWASP"],
@@ -219,9 +261,9 @@ class SkillAnalyzer:
         self.config = config
         self.client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
 
-    async def analyze(self, github_token: str, username: str,
-                      user_interests: List[str] = None,
-                      experience_level: str = "intermediate") -> Dict[str, Any]:
+    async def analyze(
+        self, github_token: str, username: str, user_interests: list[str] = None, experience_level: str = "intermediate"
+    ) -> dict[str, Any]:
         """
         Full skill analysis pipeline. Returns a complete SkillSnapshot.
 
@@ -232,7 +274,7 @@ class SkillAnalyzer:
         headers = {
             "Accept": "application/vnd.github.v3+json",
             "Authorization": f"token {github_token}",
-            "User-Agent": "Persnally-Career/1.0"
+            "User-Agent": "Persnally-Career/1.0",
         }
 
         async with httpx.AsyncClient(timeout=30.0) as http:
@@ -264,14 +306,22 @@ class SkillAnalyzer:
 
             # Step 7: AI synthesis — career narrative, strengths, growth areas
             synthesis = await self._synthesize_with_ai(
-                username, user_data, languages, frameworks, skills,
-                domains, gaps, active_repos, starred, user_interests,
-                experience_level
+                username,
+                user_data,
+                languages,
+                frameworks,
+                skills,
+                domains,
+                gaps,
+                active_repos,
+                starred,
+                user_interests,
+                experience_level,
             )
 
         return {
             "username": username,
-            "snapshot_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "snapshot_date": datetime.now(UTC).strftime("%Y-%m-%d"),
             "skills": skills,
             "languages": languages,
             "frameworks": frameworks,
@@ -301,11 +351,9 @@ class SkillAnalyzer:
     # DATA FETCHING
     # ============================================================
 
-    async def _fetch_user(self, http: httpx.AsyncClient, headers: dict,
-                          username: str) -> dict:
+    async def _fetch_user(self, http: httpx.AsyncClient, headers: dict, username: str) -> dict:
         try:
-            resp = await http.get(f"https://api.github.com/users/{username}",
-                                  headers=headers)
+            resp = await http.get(f"https://api.github.com/users/{username}", headers=headers)
             return resp.json() if resp.status_code == 200 else {}
         except Exception:
             return {}
@@ -326,8 +374,7 @@ class SkillAnalyzer:
         except Exception:
             return []
 
-    async def _fetch_starred(self, http: httpx.AsyncClient, headers: dict,
-                             username: str) -> list:
+    async def _fetch_starred(self, http: httpx.AsyncClient, headers: dict, username: str) -> list:
         try:
             resp = await http.get(
                 f"https://api.github.com/users/{username}/starred",
@@ -342,7 +389,7 @@ class SkillAnalyzer:
     # LANGUAGE ANALYSIS
     # ============================================================
 
-    def _analyze_languages(self, repos: list) -> Dict[str, Any]:
+    def _analyze_languages(self, repos: list) -> dict[str, Any]:
         """
         Analyze language distribution across all repos.
         Uses GitHub's detected language + topics for accuracy.
@@ -362,10 +409,7 @@ class SkillAnalyzer:
         for lang, repo_names in lang_repos.items():
             count = len(repo_names)
             # Check recency — any of these repos updated in last 90 days?
-            recent = any(
-                self._days_since(r.get("pushed_at", "")) < 90
-                for r in repos if r.get("language") == lang
-            )
+            recent = any(self._days_since(r.get("pushed_at", "")) < 90 for r in repos if r.get("language") == lang)
             languages[lang] = {
                 "percentage": round(count / total_repos * 100, 1),
                 "repos": count,
@@ -389,8 +433,7 @@ class SkillAnalyzer:
         )
         return sorted_repos[:limit]
 
-    async def _detect_frameworks(self, http: httpx.AsyncClient, headers: dict,
-                                  repos: list) -> List[Dict[str, Any]]:
+    async def _detect_frameworks(self, http: httpx.AsyncClient, headers: dict, repos: list) -> list[dict[str, Any]]:
         """
         For each active repo, fetch key dependency files and extract frameworks.
         This is what makes the analysis 10x better than just counting languages.
@@ -410,9 +453,7 @@ class SkillAnalyzer:
             for fw_name, fw_info in result.items():
                 if fw_name in detected:
                     detected[fw_name]["repos"].append(repo["name"])
-                    detected[fw_name]["confidence"] = min(
-                        1.0, detected[fw_name]["confidence"] + 0.1
-                    )
+                    detected[fw_name]["confidence"] = min(1.0, detected[fw_name]["confidence"] + 0.1)
                 else:
                     detected[fw_name] = {
                         "name": fw_name,
@@ -424,8 +465,7 @@ class SkillAnalyzer:
 
         return sorted(detected.values(), key=lambda x: x["confidence"], reverse=True)
 
-    async def _analyze_repo_deps(self, http: httpx.AsyncClient, headers: dict,
-                                  repo: dict) -> Dict[str, Dict]:
+    async def _analyze_repo_deps(self, http: httpx.AsyncClient, headers: dict, repo: dict) -> dict[str, dict]:
         """Analyze a single repo's dependency files."""
         detected = {}
         full_name = repo["full_name"]
@@ -519,7 +559,7 @@ class SkillAnalyzer:
 
         return detected
 
-    def _parse_npm(self, content: str) -> Dict[str, Dict]:
+    def _parse_npm(self, content: str) -> dict[str, dict]:
         """Parse package.json for framework detection."""
         detected = {}
         try:
@@ -541,7 +581,7 @@ class SkillAnalyzer:
             pass
         return detected
 
-    def _parse_pip(self, content: str) -> Dict[str, Dict]:
+    def _parse_pip(self, content: str) -> dict[str, dict]:
         """Parse requirements.txt for framework detection."""
         detected = {}
         for line in content.strip().split("\n"):
@@ -559,7 +599,7 @@ class SkillAnalyzer:
                 }
         return detected
 
-    def _parse_cargo(self, content: str) -> Dict[str, Dict]:
+    def _parse_cargo(self, content: str) -> dict[str, dict]:
         """Parse Cargo.toml for Rust framework detection."""
         detected = {}
         in_deps = False
@@ -581,7 +621,7 @@ class SkillAnalyzer:
                     }
         return detected
 
-    def _parse_gomod(self, content: str) -> Dict[str, Dict]:
+    def _parse_gomod(self, content: str) -> dict[str, dict]:
         """Parse go.mod for Go framework detection."""
         detected = {}
         go_map = {
@@ -606,8 +646,9 @@ class SkillAnalyzer:
     # SKILL SCORING
     # ============================================================
 
-    def _build_skill_scores(self, languages: dict, frameworks: list,
-                            all_repos: list, active_repos: list) -> Dict[str, Any]:
+    def _build_skill_scores(
+        self, languages: dict, frameworks: list, all_repos: list, active_repos: list
+    ) -> dict[str, Any]:
         """
         Build a unified skill map with proficiency scores.
 
@@ -627,9 +668,7 @@ class SkillAnalyzer:
             base = min(repo_count / 5, 0.4)
             recency = 0.3 if recent else 0.1
             volume = min(data["percentage"] / 30, 0.2)
-            complexity = 0.1 if any(
-                r.get("language") == lang for r in active_repos
-            ) else 0.0
+            complexity = 0.1 if any(r.get("language") == lang for r in active_repos) else 0.0
 
             score = round(min(base + recency + volume + complexity, 1.0), 2)
 
@@ -648,10 +687,10 @@ class SkillAnalyzer:
 
             # Frameworks detected from actual deps are more meaningful
             base = min(repo_count / 3, 0.4)
-            source_bonus = 0.2 if fw.get("source") in ("package.json", "requirements.txt", "Cargo.toml", "go.mod") else 0.1
-            recency = 0.3 if any(
-                r["name"] in fw.get("repos", []) for r in active_repos
-            ) else 0.1
+            source_bonus = (
+                0.2 if fw.get("source") in ("package.json", "requirements.txt", "Cargo.toml", "go.mod") else 0.1
+            )
+            recency = 0.3 if any(r["name"] in fw.get("repos", []) for r in active_repos) else 0.1
 
             score = round(min(base + source_bonus + recency + confidence * 0.1, 1.0), 2)
 
@@ -669,8 +708,7 @@ class SkillAnalyzer:
     # DOMAIN CLASSIFICATION
     # ============================================================
 
-    def _classify_domains(self, skills: dict, languages: dict,
-                          frameworks: list) -> Dict[str, float]:
+    def _classify_domains(self, skills: dict, languages: dict, frameworks: list) -> dict[str, float]:
         """
         Classify user's domain expertise using weighted signals.
         Returns domain -> confidence (0-1).
@@ -682,9 +720,7 @@ class SkillAnalyzer:
             matches = all_tech & set(signals)
             if matches:
                 # Weight by skill level
-                total_weight = sum(
-                    skills.get(m, {}).get("level", 0) for m in matches
-                )
+                total_weight = sum(skills.get(m, {}).get("level", 0) for m in matches)
                 # Normalize: 3+ strong matches = 1.0
                 domain_scores[domain] = round(min(total_weight / 2.0, 1.0), 2)
 
@@ -698,8 +734,7 @@ class SkillAnalyzer:
     # GAP ANALYSIS
     # ============================================================
 
-    def _identify_gaps(self, skills: dict, domains: dict,
-                       user_interests: list, starred: list) -> List[Dict[str, Any]]:
+    def _identify_gaps(self, skills: dict, domains: dict, user_interests: list, starred: list) -> list[dict[str, Any]]:
         """
         Identify skill gaps by analyzing:
         1. Technologies in starred repos the user doesn't have
@@ -720,13 +755,15 @@ class SkillAnalyzer:
 
         for tech, count in sorted(starred_techs.items(), key=lambda x: x[1], reverse=True):
             if tech.lower() not in user_techs and count >= 2:
-                gaps.append({
-                    "skill_name": tech,
-                    "reason": f"You've starred {count} repos using {tech} but don't use it yet",
-                    "category": "emerging",
-                    "market_demand": 0.6,
-                    "gap_score": round(min(count / 5, 1.0), 2),
-                })
+                gaps.append(
+                    {
+                        "skill_name": tech,
+                        "reason": f"You've starred {count} repos using {tech} but don't use it yet",
+                        "category": "emerging",
+                        "market_demand": 0.6,
+                        "gap_score": round(min(count / 5, 1.0), 2),
+                    }
+                )
                 if len(gaps) >= 3:
                     break
 
@@ -744,13 +781,15 @@ class SkillAnalyzer:
         adjacent = adjacency_map.get(top_domain, [])
         for tech in adjacent:
             if tech.lower() not in user_techs:
-                gaps.append({
-                    "skill_name": tech,
-                    "reason": f"Common in {top_domain} — complements your existing stack",
-                    "category": "complementary",
-                    "market_demand": 0.7,
-                    "gap_score": 0.5,
-                })
+                gaps.append(
+                    {
+                        "skill_name": tech,
+                        "reason": f"Common in {top_domain} — complements your existing stack",
+                        "category": "complementary",
+                        "market_demand": 0.7,
+                        "gap_score": 0.5,
+                    }
+                )
                 if len(gaps) >= 6:
                     break
 
@@ -768,16 +807,16 @@ class SkillAnalyzer:
             interest_lower = interest.lower()
             if interest_lower in interest_tech_map:
                 for tech in interest_tech_map[interest_lower]:
-                    if tech.lower() not in user_techs and not any(
-                        g["skill_name"] == tech for g in gaps
-                    ):
-                        gaps.append({
-                            "skill_name": tech,
-                            "reason": f"Matches your stated interest in {interest}",
-                            "category": "recommended",
-                            "market_demand": 0.8,
-                            "gap_score": 0.6,
-                        })
+                    if tech.lower() not in user_techs and not any(g["skill_name"] == tech for g in gaps):
+                        gaps.append(
+                            {
+                                "skill_name": tech,
+                                "reason": f"Matches your stated interest in {interest}",
+                                "category": "recommended",
+                                "market_demand": 0.8,
+                                "gap_score": 0.6,
+                            }
+                        )
                         break  # One gap per interest
 
         return gaps[:8]  # Cap at 8 gaps
@@ -786,12 +825,20 @@ class SkillAnalyzer:
     # AI SYNTHESIS
     # ============================================================
 
-    async def _synthesize_with_ai(self, username: str, user_data: dict,
-                                   languages: dict, frameworks: list,
-                                   skills: dict, domains: dict,
-                                   gaps: list, active_repos: list,
-                                   starred: list, user_interests: list,
-                                   experience_level: str) -> dict:
+    async def _synthesize_with_ai(
+        self,
+        username: str,
+        user_data: dict,
+        languages: dict,
+        frameworks: list,
+        skills: dict,
+        domains: dict,
+        gaps: list,
+        active_repos: list,
+        starred: list,
+        user_interests: list,
+        experience_level: str,
+    ) -> dict:
         """
         Use Claude to generate a human-readable career narrative.
         This is the ONLY AI call in the pipeline — everything else is deterministic.
@@ -804,18 +851,17 @@ class SkillAnalyzer:
             for r in active_repos[:5]
         ]
         starred_summary = [
-            f"{r.get('full_name', r.get('name', 'unknown'))} ({r.get('language', 'N/A')})"
-            for r in starred[:8]
+            f"{r.get('full_name', r.get('name', 'unknown'))} ({r.get('language', 'N/A')})" for r in starred[:8]
         ]
 
         prompt = f"""Analyze this developer's GitHub profile and generate a career intelligence summary.
 
 DEVELOPER: {username}
-BIO: {user_data.get('bio', 'N/A')}
-ACCOUNT AGE: {user_data.get('created_at', 'N/A')}
-PUBLIC REPOS: {user_data.get('public_repos', 0)}
-FOLLOWERS: {user_data.get('followers', 0)}
-STATED INTERESTS: {', '.join(user_interests) if user_interests else 'Not specified'}
+BIO: {user_data.get("bio", "N/A")}
+ACCOUNT AGE: {user_data.get("created_at", "N/A")}
+PUBLIC REPOS: {user_data.get("public_repos", 0)}
+FOLLOWERS: {user_data.get("followers", 0)}
+STATED INTERESTS: {", ".join(user_interests) if user_interests else "Not specified"}
 SELF-ASSESSED LEVEL: {experience_level}
 
 TOP SKILLS (name: level 0-1):
@@ -825,13 +871,13 @@ DOMAIN STRENGTHS:
 {json.dumps(dict(top_domains), indent=2)}
 
 ACTIVE REPOS (last 30 days):
-{chr(10).join(active_repo_summary) or 'None detected'}
+{chr(10).join(active_repo_summary) or "None detected"}
 
 RECENTLY STARRED:
-{chr(10).join(starred_summary) or 'None'}
+{chr(10).join(starred_summary) or "None"}
 
 DETECTED SKILL GAPS:
-{json.dumps([g['skill_name'] + ': ' + g['reason'] for g in gaps[:5]], indent=2)}
+{json.dumps([g["skill_name"] + ": " + g["reason"] for g in gaps[:5]], indent=2)}
 
 Generate a JSON response with EXACTLY these fields:
 {{
@@ -892,14 +938,14 @@ Rules:
             return 999
         try:
             dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            return (datetime.now(timezone.utc) - dt).days
+            return (datetime.now(UTC) - dt).days
         except Exception:
             return 999
 
     def _empty_snapshot(self, username: str) -> dict:
         return {
             "username": username,
-            "snapshot_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "snapshot_date": datetime.now(UTC).strftime("%Y-%m-%d"),
             "skills": {},
             "languages": {},
             "frameworks": [],
