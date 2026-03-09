@@ -462,16 +462,22 @@ export class InterestEngine {
   private normalizeKey(topic: string): string {
     let key = topic.toLowerCase().trim();
     // Normalize common variations before stripping
-    key = key.replace(/\.js\b/g, "js");       // "react.js" → "reactjs"
-    key = key.replace(/\.ts\b/g, "ts");       // "vue.ts" → "vuets"
-    key = key.replace(/\bnode\.js\b/g, "nodejs");
-    key = key.replace(/\bnext\.js\b/g, "nextjs");
-    key = key.replace(/\bvue\.js\b/g, "vuejs");
-    key = key.replace(/\breact\.js\b/g, "reactjs");
+    // Normalize framework names (handle "React.js", "React JS", "ReactJS" etc.)
+    key = key.replace(/\bnode[.\s]?js\b/g, "nodejs");
+    key = key.replace(/\bnext[.\s]?js\b/g, "nextjs");
+    key = key.replace(/\bvue[.\s]?js\b/g, "vuejs");
+    key = key.replace(/\breact[.\s]?js\b/g, "reactjs");
+    key = key.replace(/\bthree[.\s]?js\b/g, "threejs");
+    key = key.replace(/\bangular[.\s]?js\b/g, "angularjs");
+    key = key.replace(/\bnuxt[.\s]?js\b/g, "nuxtjs");
+    key = key.replace(/\bember[.\s]?js\b/g, "emberjs");
+    // Generic .js/.ts suffix
+    key = key.replace(/\.js\b/g, "js");
+    key = key.replace(/\.ts\b/g, "ts");
     key = key.replace(/\bc\+\+/g, "cpp");
     key = key.replace(/\bc#/g, "csharp");
     key = key.replace(/\bf#/g, "fsharp");
-    key = key.replace(/[^a-z0-9\s\-]/g, ""); // strip remaining special chars
+    key = key.replace(/[^a-z0-9\s\-]/g, "");
     key = key.replace(/\s+/g, "_");
     return key;
   }
