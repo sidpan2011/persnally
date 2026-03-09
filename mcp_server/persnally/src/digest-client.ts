@@ -63,12 +63,15 @@ export class DigestClient {
    * Send digest request to the API.
    * Returns job_id for polling, or null if API is not configured.
    */
-  async requestDigest(payload: DigestPayload): Promise<DigestResponse | null> {
+  async requestDigest(payload: DigestPayload, retryCount = 0): Promise<DigestResponse | null> {
     if (!this.apiKey && !payload.email) {
       return null;
     }
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000);
+
       const response = await fetch(`${this.apiUrl}/digest/generate`, {
         method: "POST",
         headers: {
@@ -76,7 +79,10 @@ export class DigestClient {
           ...(this.apiKey ? { "X-API-Key": this.apiKey } : {}),
         },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       if (!response.ok) {
         const text = await response.text();
@@ -87,6 +93,12 @@ export class DigestClient {
       return await response.json() as DigestResponse;
     } catch (error) {
       console.error("Failed to reach digest API:", error);
+      // Retry once on network errors after a 2s delay
+      if (retryCount < 1) {
+        console.error("Retrying requestDigest in 2s...");
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+        return this.requestDigest(payload, retryCount + 1);
+      }
       return null;
     }
   }
@@ -98,6 +110,9 @@ export class DigestClient {
     if (!this.apiKey) return;
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+
       await fetch(`${this.apiUrl}/digest/sync`, {
         method: "POST",
         headers: {
@@ -109,7 +124,10 @@ export class DigestClient {
           interest_graph: interestGraph,
           total_signals: interestGraph.total_signals,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
     } catch {
       // Best-effort, don't block
     }

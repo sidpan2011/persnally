@@ -15,22 +15,8 @@ class BehaviorAnalyzer:
     async def analyze_user_intent(self, github_data: dict, user_profile: dict) -> Dict[str, Any]:
         """Deep behavioral analysis with confidence scores and variety"""
         
-        # CRITICAL: Add variety to prevent same analysis every time
-        import random
-        analysis_angle = random.choice([
-            "Focus on learning and growth opportunities",
-            "Focus on building and shipping products", 
-            "Focus on exploring new technologies",
-            "Focus on career advancement and opportunities",
-            "Focus on community and collaboration"
-        ])
-        
         prompt = f"""
         Analyze this developer's ACTUAL behavior patterns and interests.
-        
-        ANALYSIS ANGLE FOR THIS RUN: {analysis_angle}
-        
-        Analyze from this perspective while staying factual:
         
         GITHUB ACTIVITY (REAL DATA):
         Recent Repos: {github_data.get('recent_repos', [])}
@@ -81,16 +67,12 @@ class BehaviorAnalyzer:
         - project_stage: idea/building/launching/maintaining
         """
         
-        # CRITICAL: Use higher temperature for variety in analysis
-        import random
-        temperature = random.uniform(0.6, 0.8)
-
         # Use Claude API format instead of OpenAI
         response = self.client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=1500,
-            temperature=temperature,  # Higher for variety
-            system="You are a creative developer behavior analyst. Always return valid JSON. Be diverse in your analysis - explore different angles each time.",
+            temperature=0.3,
+            system="You are a developer behavior analyst. Always return valid JSON. Be precise and evidence-based in your analysis.",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -480,15 +462,21 @@ class BehaviorAnalyzer:
         }}
         """
         
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
+        response = self.client.messages.create(
+            model="claude-sonnet-4-20250514",
             max_tokens=800,
-            temperature=0.4,
+            temperature=0.3,
+            system="You are a developer behavior analyst. Return valid JSON.",
             messages=[{"role": "user", "content": prompt}]
         )
-        
+
         try:
-            engagement_data = json.loads(response.choices[0].message.content)
+            content = response.content[0].text.strip()
+            if content.startswith('```json'):
+                content = content.split('```json')[1].split('```')[0].strip()
+            elif content.startswith('```'):
+                content = content.split('```')[1].strip()
+            engagement_data = json.loads(content)
             return engagement_data
         except:
             return {
