@@ -1,4 +1,4 @@
-# Daily Creator AI - Git Ignore File
+# Persnally - Git Ignore File
 
 # Python
 __pycache__/
@@ -130,3 +130,4 @@ node_modules/
 web/.next/
 web/.env.local
 .npmrc
+.ruff_cache/
