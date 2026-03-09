@@ -12,11 +12,10 @@ and triggers the full pipeline: research → AI curation → validation → Rese
 
 import hashlib
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
-from pydantic import BaseModel
 from middleware.auth_middleware import get_current_user
+from pydantic import BaseModel
 from services.engine_bridge import run_generation_pipeline
 from services.supabase_client import get_service_client
 
