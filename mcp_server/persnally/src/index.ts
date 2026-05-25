@@ -133,7 +133,10 @@ Call this when the user asks about their profile, interests, or what Persnally k
     for (const [category, items] of Object.entries(byCategory)) {
       text += `### ${category.charAt(0).toUpperCase() + category.slice(1)}\n`;
       for (const item of items) {
-        const weightBar = "█".repeat(Math.round(item.current_weight * 5)) + "░".repeat(5 - Math.round(item.current_weight * 5));
+        // current_weight is capped at 10 in calculateDecayedWeight, so clamp the
+        // bar to [0, 5] cells — otherwise `.repeat()` gets a negative count and throws.
+        const filled = Math.max(0, Math.min(5, Math.round(item.current_weight * 5)));
+        const weightBar = "█".repeat(filled) + "░".repeat(5 - filled);
         const sentiment = item.sentiment_balance > 0.2 ? "+" : item.sentiment_balance < -0.2 ? "-" : "~";
         text += `- ${item.topic} [${weightBar}] (${item.dominant_intent}, ${sentiment}) — ${item.frequency}x\n`;
         if (detail === "full" && item.entities.length > 0) {
