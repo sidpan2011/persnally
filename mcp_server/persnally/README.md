@@ -83,9 +83,22 @@ Your interest graph is a JSON file at `~/.persnally/interest-graph.json`. Read i
 "Clear all my Persnally data"
 
 # Environment variables (optional)
-PERSNALLY_API_URL=https://api.persnally.com
-PERSNALLY_API_KEY=your-key
+PERSNALLY_API_URL=https://api.persnally.com  # default
+PERSNALLY_API_KEY=your-key                   # only needed for cloud digest delivery
 ```
+
+### Cloud digest delivery (optional)
+
+Persnally works fully locally out of the box — the MCP tracks your interests, `persnally_interests` shows your profile, and `persnally_digest` (with `preview: true`) shows exactly what your next digest would contain. The cloud step is only needed to actually have the digest curated by the AI pipeline and delivered to your inbox via Resend.
+
+To enable it:
+
+1. Sign in at [persnally.com](https://persnally.com) and generate an API key from your dashboard.
+2. Set it as either an env var (`PERSNALLY_API_KEY=...`) or via Claude:
+
+   > "Set my Persnally API key to `<your-key>`"
+
+Without a key, every tool still works locally — your interest graph builds, digests can still be previewed, and the privacy controls (`persnally_forget`, etc.) are unaffected. Only the outbound email step is skipped.
 
 ## Development
 
