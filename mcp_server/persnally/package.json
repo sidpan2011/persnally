@@ -1,7 +1,7 @@
 {
   "name": "persnally",
   "version": "1.0.0",
-  "description": "MCP server that learns from your AI conversations and sends personalized digests",
+  "description": "Local-first personal context engine — learns who you are from your AI activity and makes every AI tool personally yours",
   "main": "build/index.js",
   "bin": {
     "persnally": "build/index.js"
@@ -38,9 +38,9 @@
     "ai",
     "claude",
     "interest-graph",
-    "newsletter",
-    "digest",
-    "resend"
+    "context-engine",
+    "personal-context",
+    "local-first"
   ],
   "license": "MIT",
   "author": "Sidhanth Pandey",
