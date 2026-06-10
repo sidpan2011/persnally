@@ -2,7 +2,7 @@
   "name": "persnallyd",
   "version": "0.1.0",
   "private": true,
-  "description": "Persnally daemon — so every AI finally knows you. Local-first context engine.",
+  "description": "Persnally daemon — the context engine for you: local-first, across every AI",
   "type": "module",
   "bin": {
     "persnallyd": "build/src/cli.js"
