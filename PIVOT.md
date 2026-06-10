@@ -29,6 +29,29 @@
 4. **Descriptive → predictive → prescriptive.** Earn each rung. Never promise prediction before description is eerily good.
 5. **Solve cold start by import, not accrual.** The wow moment must happen within 5 minutes of install.
 
+### The engine pipeline
+
+The internal architecture of `persnallyd`, mapped to the phases that ship each stage:
+
+```
+[Event Stream] → [Structured Memory] → [Pattern Extraction] → [Behavior Model]
+→ [Decision Engine] → [Action / Suggestion] → [Feedback Loop] ↺
+```
+
+| Stage | Ships in | Implementation |
+|---|---|---|
+| Event Stream | Phase 0–1 | Event schema (Phase 0's key artifact). Sources: MCP `record_event` from connected AI tools + importers (Claude/ChatGPT exports, git history) |
+| Structured Memory | Phase 1 | SQLite event store + context graph, provenance-linked, inspectable, deletable |
+| Pattern Extraction | Phase 1 | Extraction passes over the event log → descriptive profile. `interest-engine.ts` decay/sentiment logic survives as one extractor |
+| Behavior Model | Phase 3 | Preferences, tendencies, approval patterns, style constants. Descriptive → predictive, in that order |
+| Decision Engine | Phase 3 | `ask_user_model(question)` with confidence thresholds; below threshold → "ask the human" |
+| Action / Suggestion | Phase 3 | Agents first (answers degrade gracefully), proactive human suggestions last (wrong = Clippy) |
+| Feedback Loop ↺ | Phase 3 | Every approval/edit/veto flows back as a labeled event — closes itself, no manual labeling |
+
+Two deliberate deviations from the raw pipeline:
+1. **Phase 2 (The Layer) sits between Structured Memory and Behavior Model** — raw context read-back via MCP. No modeling, but it's where daily retention comes from, funding the patience the later stages need.
+2. **Stages ship demand-side, not top-down** — stages 4–7 are gated behind Phase 2's retention curve. Building the whole pipeline before users feel stage 2 is the failure mode operating principle #2 guards against.
+
 ---
 
 ## Phase 0 — Validate Before Building (2–3 weeks)
