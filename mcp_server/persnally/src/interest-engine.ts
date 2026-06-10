@@ -56,7 +56,6 @@ export interface InterestNode {
 }
 
 export interface InterestGraph {
-  user_email: string;
   created_at: string;
   updated_at: string;
   nodes: Record<string, InterestNode>;
@@ -407,7 +406,6 @@ export class InterestEngine {
 
   private emptyGraph(): InterestGraph {
     return {
-      user_email: "",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       nodes: {},
