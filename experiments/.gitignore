@@ -1,0 +1,7 @@
+# Private: experiment outputs contain personal profiles
+describe_me_output.md
+*.output.md
+# Never commit raw exports
+*conversations.json
+*export*/
+*.zip
