@@ -384,9 +384,9 @@ async def run_interest_digest(
         pass
 
     # Build research data from interest graph topics
-    # Instead of web_research.gather_comprehensive_research (which needs GitHub activity),
-    # we construct research context directly from the interest graph
-    research_data = _build_research_from_interests(interest_graph, balanced_allocation)
+    # Crawls real content from the web via Cloudflare when configured,
+    # otherwise constructs context from the interest graph for AI generation
+    research_data = await _build_research_from_interests(interest_graph, balanced_allocation)
 
     await run_generation_pipeline(
         user_id=user_id,
@@ -449,7 +449,7 @@ def _interest_graph_to_profile(
     }
 
 
-def _build_research_from_interests(
+async def _build_research_from_interests(
     interest_graph: dict,
     balanced_allocation: dict,
 ) -> dict:
@@ -457,10 +457,11 @@ def _build_research_from_interests(
     Build research_data dict from interest graph.
 
     The curation engine expects research_data with specific fields.
-    We construct a lightweight version that focuses the AI on the user's
-    actual interests rather than generic GitHub activity.
+    We construct research context from the interest graph and crawl real
+    content from the web using Cloudflare Browser Rendering when available.
     """
     topics = interest_graph.get("topics", [])
+    categories = interest_graph.get("categories", {})
 
     # Build topic descriptions for the AI to research
     topic_summaries = []
@@ -478,6 +479,18 @@ def _build_research_from_interests(
         cat_topics = [t["topic"] for t in data.get("topics", [])]
         allocation_context.append(f"{cat} ({data.get('allocation', 1)} items): {', '.join(cat_topics)}")
 
+    # Crawl real content from the web using Cloudflare
+    fresh_updates = []
+    try:
+        from src.cloudflare_crawler import crawl_content_for_interests
+
+        crawled = await crawl_content_for_interests(topics, categories)
+        if crawled:
+            fresh_updates = crawled
+            print(f"📰 Cloudflare crawled {len(crawled)} real articles for digest")
+    except Exception as e:
+        print(f"⚠️ Cloudflare crawl skipped: {e}")
+
     return {
         "github_activity": {
             "recent_repos": [],
@@ -488,8 +501,9 @@ def _build_research_from_interests(
             "topics": topic_summaries,
             "allocation": allocation_context,
             "total_signals": interest_graph.get("total_signals", 0),
-            "categories": interest_graph.get("categories", {}),
+            "categories": categories,
         },
+        "fresh_updates": fresh_updates,
         "web_results": [],
         "trending": [],
     }

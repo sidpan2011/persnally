@@ -128,7 +128,7 @@ async def check_and_send_digests():
             except Exception:
                 pass
 
-            research_data = _build_research_from_interests(interest_graph, {})
+            research_data = await _build_research_from_interests(interest_graph, {})
 
             # Fire and forget — run_generation_pipeline handles its own error reporting
             asyncio.create_task(

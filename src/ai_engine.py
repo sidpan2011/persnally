@@ -400,18 +400,18 @@ class AIEditorialEngine:
                 else "No file details available"
             )
 
-            # CRITICAL: Get news articles from web crawler (Google News, TechCrunch, Verge, Wired)
-            # REDUCED: Only send 10 articles to avoid prompt size issues
+            # Get real articles from Cloudflare crawler or legacy web sources
             fresh_updates = research_data.get("fresh_updates", [])
             if isinstance(fresh_updates, list):
-                web_news_articles = fresh_updates[:10]  # Top 10 news articles (reduced from 20)
+                web_news_articles = fresh_updates[:10]
             else:
                 web_news_articles = []
 
             web_search_summary = json.dumps(web_news_articles, indent=2) if web_news_articles else "[]"
 
+            crawled_count = sum(1 for a in web_news_articles if isinstance(a, dict) and a.get("crawled"))
             print(
-                f"📰 Passing {len(web_news_articles)} news articles to AI (from Google News, TechCrunch, Verge, Wired)"
+                f"📰 Passing {len(web_news_articles)} articles to AI ({crawled_count} real crawled, {len(web_news_articles) - crawled_count} other)"
             )
 
             # Get user's stated interests from profile - MAKE THESE PROMINENT

@@ -19,6 +19,10 @@ class Config:
     # Optional but Recommended
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
+    # Cloudflare Browser Rendering (for real content crawling)
+    CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID")
+    CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN")
+
     # Validation
     def __init__(self):
         if not self.ANTHROPIC_API_KEY:
@@ -29,6 +33,8 @@ class Config:
         # Warnings for optional but useful keys
         if not self.GITHUB_TOKEN:
             print("⚠️ GITHUB_TOKEN not found - GitHub API will be rate limited")
+        if not self.CLOUDFLARE_ACCOUNT_ID or not self.CLOUDFLARE_API_TOKEN:
+            print("⚠️ Cloudflare not configured - digests will use AI-generated content only")
 
 
 # Global config instance

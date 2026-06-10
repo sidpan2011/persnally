@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from .cache import cache_get, cache_key, cache_set
+from .cloudflare_crawler import CloudflareCrawler
 from .config import get_config
 from .topic_utils import expand_terms, relevance_score
 
@@ -86,18 +87,20 @@ class FreshContentGenerator:
 
         interests = [i.lower() for i in user_profile.get("interests", [])]
 
-        # Fetch HN stories once, then targeted GitHub searches per topic
+        # Fetch HN stories, GitHub repos, and Cloudflare crawled articles in parallel
         hn_coro = self._fetch_hn_top_stories(limit=50)
         gh_trending_coros = [self._fetch_github_trending(interests, query=q) for q in all_queries]
         gh_learning_coro = self._fetch_github_learning(interests)
         gh_opportunity_coro = self._fetch_github_opportunity(interests)
+        cf_coro = self._fetch_cloudflare_articles(sorted_topics, interest_graph.get("categories", {}))
 
-        results = await asyncio.gather(hn_coro, gh_learning_coro, gh_opportunity_coro, *gh_trending_coros)
+        results = await asyncio.gather(hn_coro, gh_learning_coro, gh_opportunity_coro, cf_coro, *gh_trending_coros)
 
         hn_stories = results[0]
         gh_learning = results[1]
         gh_opportunity = results[2]
-        gh_trending_lists = results[3:]
+        cf_articles = results[3]
+        gh_trending_lists = results[4:]
 
         # Merge all targeted GitHub results, de-duplicate by repo id
         seen_ids = set()
@@ -123,6 +126,10 @@ class FreshContentGenerator:
             self._build_learn(gh_learning, interests),
             self._build_insight(filtered_hn, interests),
         ]
+
+        # If we have crawled real articles, replace weaker slots with them
+        if cf_articles:
+            daily_5 = self._enhance_with_crawled(daily_5, cf_articles, interests)
 
         return daily_5
 
@@ -409,6 +416,96 @@ class FreshContentGenerator:
             "image_query": title,
             "meta_info": f"{points} points | {comments} comments | HackerNews",
         }
+
+    # ── Cloudflare crawled content ─────────────────────────────────
+
+    async def _fetch_cloudflare_articles(
+        self,
+        topics: list[dict[str, Any]],
+        categories: dict[str, float],
+    ) -> list[dict[str, Any]]:
+        """Fetch real articles via Cloudflare Browser Rendering crawler."""
+        try:
+            crawler = CloudflareCrawler()
+            if not crawler.enabled:
+                return []
+            return await crawler.crawl_for_interests(topics, categories)
+        except Exception as e:
+            print(f"[CloudflareCrawler] Error: {e}")
+            return []
+
+    def _enhance_with_crawled(
+        self,
+        daily_5: list[dict[str, Any]],
+        cf_articles: list[dict[str, Any]],
+        interests: list[str],
+    ) -> list[dict[str, Any]]:
+        """
+        Enhance the daily 5 by replacing fallback slots with real crawled content.
+        Only replaces items that used the _fallback() method (generic placeholders).
+        """
+        # Find slots that are fallbacks (contain "could not fetch" in description)
+        fallback_indices = []
+        for i, item in enumerate(daily_5):
+            desc = item.get("description", "")
+            if "could not fetch" in desc.lower() or not item.get("url"):
+                fallback_indices.append(i)
+
+        if not fallback_indices and not cf_articles:
+            return daily_5
+
+        # Score crawled articles by relevance
+        scored = []
+        for article in cf_articles:
+            blob = f"{article.get('title', '')} {article.get('summary', '')}"
+            score = self._relevance_score(blob, interests)
+            scored.append((score, article))
+        scored.sort(key=lambda x: -x[0])
+
+        # Replace fallback slots with best crawled articles
+        used = 0
+        for idx in fallback_indices:
+            if used >= len(scored):
+                break
+            _, article = scored[used]
+            daily_5[idx] = {
+                "category": daily_5[idx].get("category", "BREAKING"),
+                "title": article["title"],
+                "description": article.get("summary", "Read the full article for details."),
+                "action": f"Read the full article at {article['url']}",
+                "url": article["url"],
+                "image_query": article["title"][:50],
+                "meta_info": f"Source: {article.get('source', 'Web')} | {article.get('category', 'tech')}",
+            }
+            used += 1
+
+        # If we still have high-quality crawled articles and some daily_5 items
+        # have low relevance, consider swapping (only if crawled score is much higher)
+        remaining_crawled = scored[used:]
+        if remaining_crawled:
+            for i, item in enumerate(daily_5):
+                if i in fallback_indices:
+                    continue
+                if not remaining_crawled:
+                    break
+                # Only replace if the crawled article is significantly more relevant
+                current_score = self._relevance_score(
+                    f"{item.get('title', '')} {item.get('description', '')}", interests
+                )
+                crawled_score, crawled_article = remaining_crawled[0]
+                if crawled_score > current_score + 3:
+                    daily_5[i] = {
+                        "category": item.get("category", "BREAKING"),
+                        "title": crawled_article["title"],
+                        "description": crawled_article.get("summary", ""),
+                        "action": f"Read the full article at {crawled_article['url']}",
+                        "url": crawled_article["url"],
+                        "image_query": crawled_article["title"][:50],
+                        "meta_info": f"Source: {crawled_article.get('source', 'Web')}",
+                    }
+                    remaining_crawled.pop(0)
+
+        return daily_5
 
     # ── Fallback ──────────────────────────────────────────────────
 
