@@ -30,6 +30,23 @@ Distribution: CLI-installed · daemon-architected · MCP-consumed · dashboard-t
 5. **Cold start by import, not accrual.** The wow moment must land within 5 minutes of install.
 6. **Trust product:** local-first, open source, structured data only, inspectable, deletable. This is the credibility of neutrality — not optional.
 
+## Engineering standards (non-negotiable)
+
+We're building the best-engineered product in this market. Every change is held to this bar:
+
+**Code**
+- Industry best practices, always. Performant, robust, prod-ready from the first commit — no "fix it later" code.
+- **Minimal and simple beats clever.** Smallest design that solves the problem; delete code aggressively; no speculative abstractions.
+- Maintainability is a feature: clear naming, small functions, single responsibility, obvious data flow.
+- **Comments only where code can't speak** — a constraint, an invariant, a non-obvious why. Never narrate what code does. Human-readable, short, to the point: max 3–5 lines per block. No changelog/attribution comments.
+- Errors handled deliberately: no bare `except` / silent swallowing (the old codebase died of this). Fail loud or degrade gracefully on purpose, never by accident.
+
+**Process — before every commit / PR**
+1. **Test first.** Run relevant tests; write them for new behavior. Unverified code doesn't get pushed.
+2. **Self-audit the diff.** Re-read every changed line: security (auth, injection, secrets), correctness (edge cases, async/await, None-handling), leftovers (debug prints, dead code, stray comments).
+3. **Lint/type-check clean:** ruff (Python), strict `tsc --noEmit` (TypeScript). Zero warnings shipped.
+4. Small, focused PRs with honest descriptions: what changed, why, how it was verified, known risks.
+
 ## Roadmap (see PIVOT.md for detail)
 
 - **Phase 0 — Validate:** capture-rate test + import "describe me" prototype + event schema. Go/no-go on the wow moment.
@@ -40,23 +57,20 @@ Distribution: CLI-installed · daemon-architected · MCP-consumed · dashboard-t
 
 **Current phase: 0 (pre-build) — pivoting off the digest product.**
 
-## Codebase map: KEEP vs CUT
+## Codebase map (post-teardown)
 
-The repo is mid-pivot from the old product (AI-conversation interest tracker → daily email digest). When working here:
+The old digest product (email/curation/content-sourcing, ~8.9k LOC) was **removed** in the v2 teardown (PR #11). What remains:
 
 **KEEP & EVOLVE**
 - `mcp_server/persnally/src/interest-engine.ts` — the crown jewel; decay/weighting/sentiment logic becomes one extractor over the v2 event log.
 - `mcp_server/persnally/src/index.ts` — MCP scaffolding; `track`/`interests`/`forget` → `record_event`/`get_context`/delete.
 - `src/skill_analyzer.py` + `src/repo_analyzer.py` — GitHub analysis = import-based cold start (Phase 1 importer, ~80% built).
 - `src/topic_utils.py`, `src/cache.py` — generic infra, no upward deps.
+- `api/routers/digest.py` — gutted to interest-graph `/sync` + `/interests` + `/stats` only; rename prefix to `/context` in Phase 1.
 - Supabase auth (`api/middleware/auth_middleware.py`, `api/services/supabase_client.py`, `web/src/lib/supabase/*`) — for Phase 4 sync.
 - `src/behavior_analyzer.py` — salvage the extraction approach for Phase 3 (currently GitHub-only; rewrite I/O).
 
-**CUT (email/digest/curation — being removed)**
-- Email: `src/email_sender.py`, `templates/`, `mcp_server/resend/` (submodule), `src/mcp_clients/`, `src/image_fetcher.py`, `src/content_formatter.py`.
-- Curation: `src/ai_engine.py`, `content_curator.py`, `content_validator.py`, `opportunity_matcher.py`, `web_opportunity_finder.py`, `smart_user_analyzer.py`, `system_prompts.py`.
-- Content sourcing: all of `data_sources/`.
-- Digest API: `api/routers/digest.py`, `api/routers/newsletters.py`, `api/services/scheduler.py`, `api/services/engine_bridge.py`, `src/main.py`.
+**Reference (closed PR branches on remote, not merged):** `feat/cloudflare-real-content`, `feat/digest-feedback-loop`, `feat/github-seed-onboarding` (its repo→topic-category mapping feeds the Phase 1 git importer).
 
 **Greenfield (does not exist yet)** — the hardest gaps: the event-log schema, the `persnallyd` daemon, the CLI, the local dashboard, and the Claude/ChatGPT export importers.
 
