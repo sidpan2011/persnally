@@ -1,7 +1,7 @@
 {
   "name": "persnally",
   "version": "1.0.0",
-  "description": "Local-first personal context engine — learns who you are from your AI activity and makes every AI tool personally yours",
+  "description": "The context engine for you — local-first, across every AI. Learns who you are from your AI activity so every AI finally knows you.",
   "main": "build/index.js",
   "bin": {
     "persnally": "build/index.js"

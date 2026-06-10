@@ -3,7 +3,7 @@
 > Living tracker. Update on every meaningful step: what shipped, what was learned, what's next.
 > Strategy: [PIVOT.md](./PIVOT.md) · Standards: [CLAUDE.md](./CLAUDE.md) · Schema: [docs/EVENT_SCHEMA.md](./docs/EVENT_SCHEMA.md)
 
-**Current phase: 0 — Validate** (started 2026-06-11)
+**Current phase: 1 — The Mirror** (build started 2026-06-11; Phase 0 capture-rate verdict still pending ~June 25)
 
 ## Phase 0 scoreboard
 
@@ -18,6 +18,17 @@
 - [x] Import demo produces a "holy shit" reaction — *self-test passed; show 3–5 developer friends cold for the full gate*
 - [ ] Viable passive-capture path in ≥2 major clients — *capture-rate test running, verdict ~June 25*
 - [x] Written event schema + architecture doc
+
+## Phase 1 scoreboard
+
+| Deliverable | Status | Notes |
+|---|---|---|
+| `persnallyd` skeleton | ✅ Done (2026-06-11) | Event store (SQLite/WAL per EVENT_SCHEMA.md), Claude importer, CLI, loopback HTTP daemon. 13 tests green. E2E-verified against the real export: 79 events, topics view correct |
+| Decay/extraction port from interest-engine | ⬜ Next | Port to event-log extractor, fixing the raw_weight double-count |
+| Descriptive profile synthesis | ⬜ | describe-me pipeline → `signal.assertion` events + profile view |
+| ChatGPT + git importers | ⬜ | git importer reuses `skill_analyzer` logic |
+| Local dashboard | ⬜ | The trust surface and screenshot moment |
+| Signal-density floor | ⬜ | Fallback when import corpus is thin (Phase 0 finding) |
 
 ## Key findings log
 
@@ -38,6 +49,7 @@
 | 2026-06-11 | `experiments/describe_me.py` — proto-importer (export dir/json/zip → profile) |
 | 2026-06-11 | MCP telemetry (`telemetry.ts`) + `experiments/capture_rate.py` · local build registered in 3 clients |
 | 2026-06-11 | Event schema designed (`docs/EVENT_SCHEMA.md`) + this tracker |
+| 2026-06-11 | `persnallyd` skeleton: event store + Claude importer + CLI + daemon, 13 tests, e2e on real export |
 
 ## Next up
 
