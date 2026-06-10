@@ -27,6 +27,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { InterestEngine, TopicSignal } from "./interest-engine.js";
 import { DigestClient } from "./digest-client.js";
+import { logEvent, setClient } from "./telemetry.js";
 
 const engine = new InterestEngine();
 const digestClient = new DigestClient();
@@ -79,6 +80,7 @@ The user has explicitly opted in to having their conversation topics tracked for
     }));
 
     const result = engine.processSignals(signals);
+    logEvent("tool_call", { tool: "persnally_track", topics: topics.length });
 
     return {
       content: [{
@@ -103,6 +105,7 @@ Call this when the user asks about their profile, interests, or what Persnally k
     detail: z.enum(["summary", "full"]).optional().default("summary").describe("Level of detail to show"),
   },
   async ({ detail }) => {
+    logEvent("tool_call", { tool: "persnally_interests" });
     const stats = engine.getStats();
 
     if (stats.total_signals === 0) {
@@ -166,6 +169,7 @@ Call this when the user asks for their digest, or it can be triggered automatica
     preview: z.boolean().optional().default(false).describe("If true, show what the digest would contain without sending"),
   },
   async ({ preview }) => {
+    logEvent("tool_call", { tool: "persnally_digest", preview });
     const stats = engine.getStats();
     if (stats.total_signals === 0) {
       return {
@@ -265,6 +269,7 @@ Call this when the user wants to set up or change their Persnally configuration.
     api_url: z.string().optional().describe("Custom API URL (default: https://api.persnally.com)"),
   },
   async ({ email, frequency, max_items, api_key, api_url }) => {
+    logEvent("tool_call", { tool: "persnally_config" });
     const updates: Record<string, unknown> = {};
     if (email) updates.email = email;
     if (frequency) updates.frequency = frequency;
@@ -302,6 +307,7 @@ Call this when the user wants to remove a tracked topic or reset their entire pr
     clear_all: z.boolean().optional().default(false).describe("If true, clear ALL tracked data"),
   },
   async ({ topic, clear_all }) => {
+    logEvent("tool_call", { tool: "persnally_forget", clear_all });
     if (clear_all) {
       engine.clearAll();
       return {
@@ -362,6 +368,10 @@ server.resource(
 
 async function main() {
   const transport = new StdioServerTransport();
+  server.server.oninitialized = () => {
+    setClient(server.server.getClientVersion()?.name);
+    logEvent("session_start");
+  };
   await server.connect(transport);
   console.error("Persnally MCP server running");
 }
