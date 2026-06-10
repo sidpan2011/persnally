@@ -1,0 +1,28 @@
+{
+  "name": "persnallyd",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Persnally v2 daemon — local-first personal context engine",
+  "type": "module",
+  "bin": {
+    "persnallyd": "build/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "tsc && node --test \"build/test/*.test.js\"",
+    "serve": "tsc && node build/src/cli.js serve"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "better-sqlite3": "^11.8.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.5",
+    "typescript": "^5.7.3"
+  }
+}
