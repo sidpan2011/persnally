@@ -1,6 +1,5 @@
 """
 Career Bridge - Connects the FastAPI layer to the Skill Analyzer engine.
-Follows the same pattern as engine_bridge.py.
 """
 
 from datetime import datetime
