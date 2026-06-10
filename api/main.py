@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import digest, github, health, newsletters, preferences, skills, users
+from routers import digest, github, health, newsletters, preferences, seed, skills, users
 
 from config import FRONTEND_URL
 
@@ -53,4 +53,5 @@ app.include_router(preferences.router)
 app.include_router(newsletters.router)
 app.include_router(github.router)
 app.include_router(skills.router)
+app.include_router(seed.router)
 app.include_router(digest.router)

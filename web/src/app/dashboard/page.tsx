@@ -38,6 +38,8 @@ export default function DashboardOverview() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [interests, setInterests] = useState<InterestData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [generateJobId, setGenerateJobId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     const supabase = createClient();
@@ -81,36 +83,54 @@ export default function DashboardOverview() {
 
   if (!hasData) {
     return (
-      <div className="max-w-lg mx-auto text-center py-20">
-        <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-          <svg
-            className="w-8 h-8 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-black">Welcome to Persnally</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            We&apos;re analyzing your GitHub to build your initial interest profile...
+          </p>
+        </div>
+
+        {/* GitHub Seeding Status */}
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <svg className="w-6 h-6 text-gray-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-bold text-black mb-2">
+            Building your interest profile
+          </h2>
+          <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">
+            We&apos;re analyzing your GitHub repos, stars, and languages to create your initial profile. This usually takes a few seconds.
+          </p>
+          <button
+            onClick={() => loadData()}
+            className="px-4 py-2 bg-black text-white text-sm rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
-            />
-          </svg>
+            Refresh
+          </button>
         </div>
-        <h2 className="text-xl font-bold text-black mb-2">
-          No interests tracked yet
-        </h2>
-        <p className="text-gray-500 text-sm leading-relaxed mb-6">
-          Install the Persnally MCP server and start chatting with Claude. Your
-          interest graph will build automatically as you discuss topics you care
-          about.
-        </p>
-        <div className="bg-gray-950 rounded-lg p-4 text-left font-mono text-sm text-gray-300 mb-4">
-          <span className="text-green-400">$</span> npm install -g persnally
+
+        {/* MCP Upsell */}
+        <div className="bg-gray-50 rounded-xl border border-gray-100 p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-semibold text-black text-sm">Make it smarter with Claude</h3>
+              <p className="text-sm text-gray-500 mt-1 mb-3">
+                Install the MCP server to let Persnally learn from your Claude conversations. Your profile gets more accurate every day.
+              </p>
+              <div className="bg-gray-950 rounded-lg p-3 font-mono text-sm text-gray-300 inline-block">
+                <span className="text-green-400">$</span> npm install -g persnally
+              </div>
+            </div>
+          </div>
         </div>
-        <p className="text-xs text-gray-400">
-          Then add it to your Claude Desktop config and start chatting.
-        </p>
       </div>
     );
   }
@@ -144,6 +164,36 @@ export default function DashboardOverview() {
             <div className="text-xs text-gray-400">{stat.sub}</div>
           </div>
         ))}
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={async () => {
+            setGenerating(true);
+            try {
+              const supabase = createClient();
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session) {
+                const result = await apiFetch("/newsletters/generate", session.access_token, { method: "POST" });
+                setGenerateJobId(result.job_id);
+              }
+            } catch (e) {
+              console.error("Generate failed:", e);
+            } finally {
+              setGenerating(false);
+            }
+          }}
+          disabled={generating}
+          className="px-4 py-2 bg-black text-white text-sm rounded-lg hover:bg-gray-800 transition-colors disabled:bg-gray-300 cursor-pointer"
+        >
+          {generating ? "Generating..." : "Generate Digest"}
+        </button>
+        {generateJobId && (
+          <span className="text-sm text-gray-500 self-center">
+            Digest queued! Check your email shortly.
+          </span>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">

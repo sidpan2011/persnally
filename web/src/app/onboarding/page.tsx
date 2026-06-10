@@ -131,6 +131,13 @@ export default function OnboardingPage() {
         body: JSON.stringify({ onboarded: true }),
       });
 
+      // Trigger GitHub seed in background (non-blocking)
+      try {
+        await apiFetch("/seed/github", token, { method: "POST" });
+      } catch {
+        // Non-blocking — dashboard will show empty state if seed fails
+      }
+
       router.push("/dashboard");
     } catch (err) {
       console.error("Onboarding error:", err);
@@ -341,6 +348,29 @@ export default function OnboardingPage() {
                   )
                 )}
               </div>
+            </div>
+
+            {/* MCP Server Setup */}
+            <div className="mb-8 bg-gray-50 rounded-xl p-5 border border-gray-200">
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-black">Supercharge with Claude (optional)</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Install the MCP server to let Claude learn your interests from natural conversations. Your dashboard will get smarter over time.
+                  </p>
+                </div>
+              </div>
+              <div className="bg-gray-950 rounded-lg p-3 font-mono text-sm text-gray-300">
+                <span className="text-green-400">$</span> npm install -g persnally
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                You can always set this up later from Settings.
+              </p>
             </div>
 
             <div className="flex gap-3">

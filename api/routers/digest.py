@@ -189,13 +189,17 @@ async def sync_interest_graph(
     """
     Sync interest graph from MCP server to cloud.
     Called periodically so the web dashboard can show the user's interest profile.
+
+    Merges MCP topics with the user's onboarding interests from user_preferences
+    so web-selected interests are never silently erased by an MCP sync.
     """
     client = get_service_client()
     try:
+        merged_graph = _merge_onboarding_interests(client, user["id"], payload.interest_graph)
         client.table("interest_snapshots").upsert(
             {
                 "user_id": user["id"],
-                "interest_graph": payload.interest_graph,
+                "interest_graph": merged_graph,
                 "total_signals": payload.total_signals,
                 "synced_at": datetime.utcnow().isoformat(),
             },
@@ -396,6 +400,54 @@ async def run_interest_digest(
         research_data=research_data,
         newsletter_extra_fields={"source": "mcp_interest_graph"},
     )
+
+
+def _merge_onboarding_interests(client, user_id: str, mcp_graph: dict) -> dict:
+    """
+    Merge onboarding interests from user_preferences into the MCP interest graph.
+
+    When MCP syncs, it sends only topics from conversations. But the user also
+    selected interests during onboarding (e.g., "AI/ML", "Hackathons"). These
+    should appear in the graph as low-weight seeds unless MCP has already
+    tracked them with higher weight.
+    """
+    try:
+        prefs = client.table("user_preferences").select("interests").eq("user_id", user_id).maybe_single().execute()
+        if not prefs or not prefs.data or not prefs.data.get("interests"):
+            return mcp_graph
+    except Exception:
+        return mcp_graph
+
+    onboarding = prefs.data["interests"]
+    if not isinstance(onboarding, list) or not onboarding:
+        return mcp_graph
+
+    topics = mcp_graph.get("topics", [])
+    existing_names = {t.get("topic", "").lower() for t in topics}
+
+    # Add onboarding interests that MCP hasn't tracked yet
+    added = 0
+    for interest in onboarding:
+        normalized = interest.strip().lower().replace(" ", "-").replace("/", "-")
+        if normalized not in existing_names and interest.lower() not in existing_names:
+            topics.append(
+                {
+                    "topic": normalized,
+                    "weight": 0.3,
+                    "category": "technology",
+                    "intent": "learning",
+                    "entities": [],
+                    "sentiment_balance": 0.5,
+                }
+            )
+            existing_names.add(normalized)
+            added += 1
+
+    if added:
+        mcp_graph["topics"] = topics
+        print(f"Merged {added} onboarding interests into MCP graph")
+
+    return mcp_graph
 
 
 def _interest_graph_to_profile(
