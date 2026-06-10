@@ -38,7 +38,7 @@ We're building the best-engineered product in this market. Every change is held 
 - Industry best practices, always. Performant, robust, prod-ready from the first commit — no "fix it later" code.
 - **Minimal and simple beats clever.** Smallest design that solves the problem; delete code aggressively; no speculative abstractions.
 - Maintainability is a feature: clear naming, small functions, single responsibility, obvious data flow.
-- **Comments only where code can't speak** — a constraint, an invariant, a non-obvious why. Never narrate what code does. Human-readable, short, to the point: max 3–5 lines per block. No changelog/attribution comments.
+- **Comments only where code can't speak** — a constraint, an invariant, a non-obvious why. Never narrate what code does. Human-readable, short, to the point: max 2–3 lines per block. No changelog/attribution comments.
 - Errors handled deliberately: no bare `except` / silent swallowing (the old codebase died of this). Fail loud or degrade gracefully on purpose, never by accident.
 
 **Process — before every commit / PR**
