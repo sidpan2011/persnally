@@ -8,7 +8,7 @@ import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
 import { parseClaudeExport, extractEvents } from "./importers/claude.js";
 import { DEFAULT_DB_PATH, EventStore } from "./store.js";
 
-const USAGE = `persnallyd ${VERSION} — Persnally personal context engine
+const USAGE = `persnallyd ${VERSION} — so every AI finally knows you
 
 Usage:
   persnallyd init                   Create the local store (~/.persnally/persnally.db)

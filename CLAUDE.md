@@ -6,7 +6,8 @@
 
 **Persnally is a local-first personal context engine.** It learns who you are from your AI activity and makes every AI tool and agent personally yours — without any single platform owning your data.
 
-**One-liner:** *The giants build the intelligence. Persnally makes it yours.*
+**One-liner (pitch):** *The giants build the intelligence. Persnally makes it yours.*
+**Tagline (product):** *So every AI finally knows you.*
 
 We are **not** competing with Claude/ChatGPT/Cursor. We sit **on top of them** via MCP (their own protocol) as the neutral, user-owned context layer they structurally can't build for each other.
 
