@@ -109,13 +109,9 @@ def assemble_corpus(conversations: list, export_dir: Path | None) -> tuple[str, 
         mem_file = export_dir / "memories.json"
         if mem_file.exists():
             memories = json.loads(mem_file.read_text())
-            memory_text = "\n".join(
-                m.get("conversations_memory", "") for m in memories if isinstance(m, dict)
-            )
+            memory_text = "\n".join(m.get("conversations_memory", "") for m in memories if isinstance(m, dict))
             if memory_text.strip():
-                sections.append(
-                    "\n--- ASSISTANT'S ACCUMULATED MEMORY OF USER ---\n" + memory_text
-                )
+                sections.append("\n--- ASSISTANT'S ACCUMULATED MEMORY OF USER ---\n" + memory_text)
 
     return "\n\n".join(sections), stats
 

@@ -1,0 +1,28 @@
+/**
+ * Local-only telemetry for the Phase 0 capture-rate experiment.
+ * Appends one JSON line per event to ~/.persnally/telemetry.jsonl — counts and
+ * timestamps only, never conversation content. Analyzed by experiments/capture_rate.py.
+ */
+
+import { appendFileSync, existsSync, mkdirSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
+
+const DIR = join(homedir(), ".persnally");
+const FILE = join(DIR, "telemetry.jsonl");
+
+let clientName = "unknown";
+
+export function setClient(name: string | undefined): void {
+  if (name) clientName = name;
+}
+
+export function logEvent(event: string, data: Record<string, unknown> = {}): void {
+  try {
+    if (!existsSync(DIR)) mkdirSync(DIR, { recursive: true });
+    const line = JSON.stringify({ ts: new Date().toISOString(), event, client: clientName, ...data });
+    appendFileSync(FILE, line + "\n");
+  } catch {
+    // Telemetry must never break the server.
+  }
+}
