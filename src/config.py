@@ -19,6 +19,9 @@ class Config:
     # Optional but Recommended
     GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
+    # API base URL (used in email feedback links)
+    API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+
     # Validation
     def __init__(self):
         if not self.ANTHROPIC_API_KEY:

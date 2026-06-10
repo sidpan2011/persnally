@@ -97,6 +97,8 @@ class PremiumEmailSender:
             # user_intent is not a dict (might be a string), use empty list
             active_repos = []
 
+        user_interests = user_data.get("interests", [])
+
         for item in daily_5_content.get("items", []):
             formatted_item = item.copy()
 
@@ -111,6 +113,12 @@ class PremiumEmailSender:
                 formatted_content = self.content_formatter.add_source_attribution(formatted_content, source, source_url)
 
             formatted_item["content"] = formatted_content
+
+            # Compute "why we picked this" reason
+            pick_reason, primary_topic = self._compute_pick_reason(item, user_interests, active_repos)
+            formatted_item["pick_reason"] = pick_reason
+            formatted_item["primary_topic"] = primary_topic
+
             formatted_items.append(formatted_item)
 
         # Create Jinja2 environment with custom markdown filter
@@ -118,13 +126,20 @@ class PremiumEmailSender:
         env.filters["markdown_to_html"] = self._markdown_to_html
         template = env.from_string(template_content)
 
+        # Resolve the API base URL for feedback links
+        feedback_base_url = (
+            self.config.API_BASE_URL if hasattr(self.config, "API_BASE_URL") else "https://api.persnally.com"
+        )
+
         return template.render(
             user_name=user_data["name"],
+            user_id=user_data.get("id", ""),
             headline=daily_5_content["headline"],
             personalization_note=daily_5_content.get("personalization_note", ""),
-            items=formatted_items,  # Use formatted items
+            items=formatted_items,
             key_insights=daily_5_content.get("key_insights", []),
             date=daily_5_content["date"],
+            feedback_base_url=feedback_base_url,
         )
 
     def _generate_premium_email_html(self, user_data: dict, editorial_content: dict[str, str]) -> str:
@@ -205,6 +220,37 @@ class PremiumEmailSender:
             html = html.replace("</li>", "</li></ol>", 1)
 
         return html
+
+    def _compute_pick_reason(self, item: dict, user_interests: list[str], active_repos: list[str]) -> tuple[str, str]:
+        """Return a short human-readable reason why this item was picked, plus the primary matching topic."""
+        title_and_content = (
+            item.get("title", "") + " " + item.get("content", "") + " " + item.get("description", "")
+        ).lower()
+
+        # Check direct interest matches
+        matched = [i for i in user_interests if i.lower() in title_and_content]
+        if matched:
+            primary = matched[0]
+            if len(matched) == 1:
+                return f"Picked for you — matches your interest in {matched[0]}", primary
+            return f"Picked for you — matches {matched[0]} and {matched[1]}", primary
+
+        # Check repo matches
+        for repo in active_repos[:5]:
+            if repo.lower() in title_and_content:
+                return f"Picked for you — relevant to your project {repo}", repo
+
+        # Check category match
+        category = item.get("category", "")
+        if category:
+            return f"Picked for you — trending in {category}", category
+
+        # Fallback: source quality
+        source = item.get("source", "")
+        if source:
+            return f"Picked for you — from {source}", ""
+
+        return "Picked for you — based on your profile", ""
 
     def _format_content_for_email(self, content: str) -> str:
         """Format content for email HTML"""

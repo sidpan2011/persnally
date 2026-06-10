@@ -263,6 +263,17 @@
             border-color: #fca5a5;
         }
 
+        /* Why we picked this */
+        .pick-reason {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 16px;
+            padding: 8px 12px;
+            background-color: #f9fafb;
+            border-left: 3px solid #e5e7eb;
+            border-radius: 0 6px 6px 0;
+        }
+
         /* Key Insights Section */
         .key-insights {
             margin-top: 56px;
@@ -397,13 +408,24 @@
             {% if items and items|length > 0 %}
             {% for item in items %}
             <div class="article-item">
-                <!-- Removed generic category labels as per feedback -->
                 <h2 class="article-title">{{ item.title }}</h2>
+                {% if item.pick_reason %}
+                <div class="pick-reason">{{ item.pick_reason }}</div>
+                {% endif %}
                 {% if item.image_url %}
                 <img src="{{ item.image_url }}" alt="{{ item.title }}" class="article-image">
                 {% endif %}
                 <div class="article-description">
                     {{ item.content | markdown_to_html | safe }}
+                </div>
+                <div class="article-actions">
+                    {% if item.source_url %}
+                    <a href="{{ item.source_url }}" class="read-more-btn" style="background-color:#f5f5f5;color:#1a1a1a;">Read source &rarr;</a>
+                    {% endif %}
+                    <div class="feedback-buttons">
+                        <a href="{{ feedback_base_url }}/feedback/vote?user_id={{ user_id }}&item_id={{ loop.index }}&vote=up&topic={{ item.primary_topic | default('') | urlencode }}" class="feedback-btn upvote" title="More like this">&#128077;</a>
+                        <a href="{{ feedback_base_url }}/feedback/vote?user_id={{ user_id }}&item_id={{ loop.index }}&vote=down&topic={{ item.primary_topic | default('') | urlencode }}" class="feedback-btn downvote" title="Less like this">&#128078;</a>
+                    </div>
                 </div>
             </div>
             {% endfor %}
