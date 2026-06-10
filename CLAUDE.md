@@ -1,6 +1,6 @@
 # Persnally — Project Guide (v2)
 
-> **Full strategy lives in [PIVOT.md](./PIVOT.md). This file is the always-loaded summary — keep it short.**
+> **Full strategy lives in [PIVOT.md](./PIVOT.md). Status lives in [PROGRESS.md](./PROGRESS.md) — update it on every meaningful step. This file is the always-loaded summary — keep it short.**
 
 ## What we're building (v2)
 
@@ -72,7 +72,7 @@ The old digest product (email/curation/content-sourcing, ~8.9k LOC) was **remove
 
 **Reference (closed PR branches on remote, not merged):** `feat/cloudflare-real-content`, `feat/digest-feedback-loop`, `feat/github-seed-onboarding` (its repo→topic-category mapping feeds the Phase 1 git importer).
 
-**Greenfield (does not exist yet)** — the hardest gaps: the event-log schema, the `persnallyd` daemon, the CLI, the local dashboard, and the Claude/ChatGPT export importers.
+**Greenfield (does not exist yet)** — the hardest gaps: the `persnallyd` daemon, the CLI, the local dashboard, and the production importers. The event schema is designed: [docs/EVENT_SCHEMA.md](./docs/EVENT_SCHEMA.md) — append-only event log, derived views, provenance graph. All v2 persistence work builds on it.
 
 ## Deployment (current, pre-pivot)
 
