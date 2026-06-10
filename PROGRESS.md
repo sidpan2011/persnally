@@ -49,13 +49,15 @@
 | 2026-06-11 | `experiments/describe_me.py` — proto-importer (export dir/json/zip → profile) |
 | 2026-06-11 | MCP telemetry (`telemetry.ts`) + `experiments/capture_rate.py` · local build registered in 3 clients |
 | 2026-06-11 | Event schema designed (`docs/EVENT_SCHEMA.md`) + this tracker |
-| 2026-06-11 | `persnallyd` skeleton: event store + Claude importer + CLI + daemon, 13 tests, e2e on real export |
+| 2026-06-11 | `persnallyd` skeleton: event store + Claude importer + CLI + daemon, 13 tests, e2e on real export (PR #13, merged) |
+| 2026-06-11 | Brand kit locked: pitch / tagline ("So every AI finally knows you") / descriptor ("The context engine for you") / competitive contrast — applied to CLI, packages, GitHub about |
 
 ## Next up
 
 1. **Show the describe-me output to 3–5 developer friends** (cold) — the real exit-criterion test.
 2. **~June 25:** run capture-rate analysis (fresh Claude export needed for the Desktop denominator) → Phase 0 verdict: is passive accrual a complement or does import carry v2 alone?
-3. **Phase 1 prep** (only after Phase 0 closes): `persnallyd` skeleton — SQLite event store per schema, Claude-export importer as first event producer, `persnally` CLI (`init|import|show|forget`).
+3. **Decay/extraction port** into `store.rebuild()` — interest-engine weighting with the raw_weight double-count fix (first open item on the Phase 1 scoreboard).
+4. **Profile synthesis** — describe-me pipeline as a daemon extraction pass → `signal.assertion` events + profile view; then dashboard.
 
 ## Known issues / carry-forward
 
