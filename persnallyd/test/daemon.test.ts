@@ -73,6 +73,22 @@ test("POST /events without id gets one assigned by the daemon", async () => {
   assert.match(body.ids[0] ?? "", /^[0-9a-f-]{36}$/);
 });
 
+test("POST /events accepts context.read and keeps it out of /topics", async () => {
+  const before = await (await fetch(BASE + "/topics")).json() as Array<{ topic_key: string }>;
+  const r = await fetch(BASE + "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "context.read",
+      source: "mcp:cursor",
+      payload: { scope: "brief", client_purpose: "personalize review", items: 4 },
+      provenance: { kind: "mcp", client: "cursor" },
+    }),
+  });
+  assert.equal(r.status, 201);
+  const after = await (await fetch(BASE + "/topics")).json() as Array<{ topic_key: string }>;
+  assert.deepEqual(after.map((t) => t.topic_key), before.map((t) => t.topic_key));
+});
+
 test("DELETE /events requires explicit confirmation, then wipes", async () => {
   assert.equal((await fetch(BASE + "/events", { method: "DELETE" })).status, 400);
   const r = await fetch(BASE + "/events?confirm=all", { method: "DELETE" });

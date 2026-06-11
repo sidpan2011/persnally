@@ -39,6 +39,7 @@
 | Per-client permission scoping | ✅ Done (2026-06-12) | Category allowlists per client, default-open, enforced at the daemon (`/topics` filtered, `/profile` 403 for scoped clients). `persnallyd scope <client> <cats\|--clear>`. Real run: cursor scoped to technology,career saw exactly those + profile 403 |
 | `persnally connect <client>` one-command setup | ✅ Done (2026-06-12) | `persnallyd connect [client\|--all]` + full `persnallyd setup` onboarding (find exports → import → synthesize → connect → open dashboard) |
 | Nightly consolidation pass | ✅ Done (2026-06-12) | Daemon checks every 30min, reflects once/day at 3am local: refreshes decay, emits ≤3 `behavior` assertions (derived provenance) over new signals, re-synthesizes. `persnallyd consolidate` for manual runs. Real run: 82 signals → 3 assertions incl. a detected attention *shift* over time |
+| `context.read` instrumentation | ✅ Done (2026-06-12) | Every `persnally_context` call appends a `context.read` event (scope, optional `purpose` from the calling AI, items served) via the daemon write path — the north star (context reads/user/week) is now measurable, and the feedback-loop arc starts accruing data for Phase 3. Recording failure never breaks the read; empty-store reads don't record |
 
 ## Key findings log
 
@@ -72,6 +73,7 @@
 | 2026-06-12 | FSL-1.1-MIT license under **Persnally** (brand-as-licensor; legal entity swapped in at incorporation); README rewritten for v2; public ROADMAP.md (PR #19) |
 | 2026-06-12 | One npm package: `persnally@2.0.0` — MCP server folded into `persnallyd/src/mcp/`, bins `persnally`/`persnallyd`/`persnally-mcp`, `mcp_server/` deleted, CI folded. Dry-run clean. **Publish blocked by npm 24h unpublish cooldown until 2026-06-12 19:54 UTC (01:25 IST Jun 13)** — auth/2FA already verified |
 | 2026-06-12 | (Corrected) Actions never stalled — PR #19 merged at 19:41 UTC and later pushes went to the already-merged branch, which triggers no CI event. Lesson: check PR state before stacking commits |
+| 2026-06-12 | `context.read` emission wired into `persnally_context` (was schema-only — north-star metric was unmeasurable). New optional `purpose` param captures why the AI read context. 60 tests + e2e green |
 
 ## Next up
 
