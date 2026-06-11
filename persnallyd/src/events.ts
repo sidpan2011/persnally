@@ -81,7 +81,7 @@ export const provenanceSchema = z.discriminatedUnion("kind", [
     conversation_uuid: z.string().optional(),
     message_uuid: z.string().optional(),
   }),
-  z.object({ kind: z.literal("git"), repo: z.string(), ref: z.string().optional() }),
+  z.object({ kind: z.literal("git"), repo: z.string(), ref: z.string().optional(), batch: z.string().optional() }),
   z.object({ kind: z.literal("derived"), from: z.array(z.string()).min(1) }),
   z.object({ kind: z.literal("local"), surface: z.enum(["cli", "dashboard"]) }),
 ]);
