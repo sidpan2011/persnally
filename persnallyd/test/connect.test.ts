@@ -9,7 +9,13 @@ import { promisify } from "node:util";
 const run = promisify(execFile);
 const home = mkdtempSync(join(tmpdir(), "connect-test-"));
 const CLI = join(import.meta.dirname, "..", "src", "cli.js");
-const env = { ...process.env, HOME: home, PERSNALLY_DIR: join(home, ".persnally") };
+
+// Hermetic MCP target: CI doesn't build the sibling mcp_server package (build/ is gitignored).
+const fakeMcp = join(home, "fake-mcp", "index.js");
+mkdirSync(join(home, "fake-mcp"));
+writeFileSync(fakeMcp, "// stub\n");
+
+const env = { ...process.env, HOME: home, PERSNALLY_DIR: join(home, ".persnally"), PERSNALLY_MCP: fakeMcp };
 
 after(() => rmSync(home, { recursive: true, force: true }));
 
