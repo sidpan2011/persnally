@@ -94,7 +94,7 @@ export const eventSchema = z.object({
   recorded_at: z.string().datetime({ offset: true }),
   source: z.string().regex(sourcePattern),
   type: z.enum(EVENT_TYPES as [EventType, ...EventType[]]),
-  payload: z.record(z.unknown()),
+  payload: z.record(z.string(), z.unknown()),
   provenance: provenanceSchema,
   schema_ver: z.literal(SCHEMA_VERSION),
 });

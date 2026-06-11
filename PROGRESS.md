@@ -24,8 +24,8 @@
 | Deliverable | Status | Notes |
 |---|---|---|
 | `persnallyd` skeleton | ✅ Done (2026-06-11) | Event store (SQLite/WAL per EVENT_SCHEMA.md), Claude importer, CLI, loopback HTTP daemon. 13 tests green. E2E-verified against the real export: 79 events, topics view correct |
-| Decay/extraction port from interest-engine | ⬜ Next | Port to event-log extractor, fixing the raw_weight double-count |
-| Descriptive profile synthesis | ⬜ | describe-me pipeline → `signal.assertion` events + profile view |
+| Decay/extraction port from interest-engine | ✅ Done (2026-06-11) | `decay.ts`: per-signal decay (fixes raw_weight double-count + dominant-intent bug). Verified on real data: stale March topics correctly decayed below fresh June ones |
+| Descriptive profile synthesis | ✅ Done (2026-06-11) | `persnallyd profile` → Fable 5 via structured outputs → `view_profile`, each section evidence-linked to event ids. Served at `GET /profile`. Real run produced a startling profile from structured events alone |
 | ChatGPT + git importers | ⬜ | git importer reuses `skill_analyzer` logic |
 | Local dashboard | ⬜ | The trust surface and screenshot moment |
 | Signal-density floor | ⬜ | Fallback when import corpus is thin (Phase 0 finding) |
@@ -51,6 +51,7 @@
 | 2026-06-11 | Event schema designed (`docs/EVENT_SCHEMA.md`) + this tracker |
 | 2026-06-11 | `persnallyd` skeleton: event store + Claude importer + CLI + daemon, 13 tests, e2e on real export (PR #13, merged) |
 | 2026-06-11 | Brand kit locked: pitch / tagline ("So every AI finally knows you") / descriptor ("The context engine for you") / competitive contrast — applied to CLI, packages, GitHub about |
+| 2026-06-11 | The Mirror loop complete: decay port + profile synthesis (`persnallyd profile`, `GET /profile`), 22 tests. Key learning: Fable 5 rejects forced tool_choice — moved all extraction to structured outputs (`messages.parse` + `zodOutputFormat`), deleting the hand-rolled schema converter |
 
 ## Next up
 
