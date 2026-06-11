@@ -113,6 +113,17 @@ assert.match(ctx, /A builder/);
 assert.match(ctx, /rust.*0\.90/);
 console.log("✅ context renders profile + topics");
 
+// ── context reads are recorded as context.read events (the north-star metric) ──
+const reads = () => received.posts.filter((p) => Array.isArray(p) && p[0]?.type === "context.read");
+assert.equal(reads().length, 1, "context must record a context.read event");
+assert.equal(reads()[0][0].source, "mcp:e2e-test");
+assert.deepEqual(reads()[0][0].provenance, { kind: "mcp", client: "e2e-test" });
+assert.deepEqual(reads()[0][0].payload, { scope: "brief", client_purpose: "", items: 2 });
+await callTool("persnally_context", { detail: "full", purpose: "personalize a code review" });
+assert.equal(reads().length, 2);
+assert.deepEqual(reads()[1][0].payload, { scope: "full", client_purpose: "personalize a code review", items: 2 });
+console.log("✅ context reads recorded with scope, purpose, items");
+
 // ── interests + forget ──
 assert.match(await callTool("persnally_interests", {}), /rust — 0\.90/);
 await callTool("persnally_forget", { topic: "rust" });

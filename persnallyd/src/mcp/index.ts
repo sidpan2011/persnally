@@ -46,6 +46,27 @@ async function guarded(fn: () => Promise<{ content: { type: "text"; text: string
   }
 }
 
+/** Event sources must match ^mcp:[a-z0-9._-]+$ — slugify whatever name the client reports. */
+function clientSlug(): string {
+  return getClient().toLowerCase().replace(/[^a-z0-9._-]/g, "-");
+}
+
+/** The north-star metric (context reads/user/week) is measured from these events.
+    Recording must never break the read itself — failures only log to stderr. */
+async function recordRead(scope: string, purpose: string | undefined, items: number): Promise<void> {
+  const client = clientSlug();
+  try {
+    await daemonPost("/events", [{
+      type: "context.read",
+      source: `mcp:${client}`,
+      payload: { scope, client_purpose: purpose ?? "", items },
+      provenance: { kind: "mcp", client },
+    }]);
+  } catch (e) {
+    console.error("persnally: context.read not recorded:", e instanceof Error ? e.message : e);
+  }
+}
+
 // ── persnally_track — write path ────────────────────────────
 
 server.tool(
@@ -76,7 +97,7 @@ The user opted in. Only structured signals are stored, locally, never raw messag
   async ({ topics }) =>
     guarded(async () => {
       logEvent("tool_call", { tool: "persnally_track", topics: topics.length });
-      const client = getClient().toLowerCase().replace(/[^a-z0-9._-]/g, "-");
+      const client = clientSlug();
       const events = topics.map((t) => ({
         type: "signal.topic",
         source: `mcp:${client}`,
@@ -97,8 +118,9 @@ server.tool(
 Call this at the START of a conversation (or when personalization would improve your answer) so your responses fit this specific user instead of a generic one.`,
   {
     detail: z.enum(["brief", "full"]).optional().default("brief"),
+    purpose: z.string().max(200).optional().describe("Why context is being read right now, in a short phrase (e.g. 'tailor architecture advice')"),
   },
-  async ({ detail }) =>
+  async ({ detail, purpose }) =>
     guarded(async () => {
       logEvent("tool_call", { tool: "persnally_context", detail });
       const client = encodeURIComponent(getClient());
@@ -110,15 +132,18 @@ Call this at the START of a conversation (or when personalization would improve 
         return text("No context yet — the user hasn't imported data or tracked any signals.");
       }
       let out = "";
+      let items = topics?.length ?? 0;
       if (profile) {
         out += `# About this user\n${profile.headline}\n\n`;
         const sections = detail === "full" ? profile.sections : profile.sections.slice(0, 3);
+        items += sections.length;
         out += sections.map((s) => `## ${s.title}\n${s.body}`).join("\n\n");
       }
       if (topics?.length) {
         out += `\n\n# Current interests (decay-weighted)\n`;
         out += topics.map((t) => `- ${t.topic} (${t.category}, ${t.dominant_intent}, weight ${t.weight.toFixed(2)})`).join("\n");
       }
+      await recordRead(detail, purpose, items);
       return text(out);
     }),
 );
