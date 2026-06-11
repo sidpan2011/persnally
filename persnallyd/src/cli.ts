@@ -4,8 +4,14 @@
  * Merges into the `persnally` npm identity at Phase 1 launch.
  */
 
+import { execFileSync } from "node:child_process";
+import { existsSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { applyApiKey, configPath, loadConfig, saveConfig } from "./config.js";
+import { CLIENTS, connectAll, connectClient, type Client } from "./connect.js";
 import { chooseExtractor } from "./llm.js";
+import { alreadyImported, detectExports, markImported } from "./setup.js";
 import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
 import { extractChatGPTEvents, parseChatGPTExport } from "./importers/chatgpt.js";
 import { extractClaudeEvents, parseClaudeExport } from "./importers/claude.js";
@@ -20,6 +26,8 @@ import { DEFAULT_DB_PATH, EventStore } from "./store.js";
 const USAGE = `persnallyd ${VERSION} — so every AI finally knows you
 
 Usage:
+  persnallyd setup                  One command: find exports, import, synthesize, connect, open
+  persnallyd connect [client|--all] Add Persnally to claude-code | claude-desktop | cursor
   persnallyd init                   Create the local store (~/.persnally/persnally.db)
   persnallyd import claude <dir>    Import a Claude data export (needs ANTHROPIC_API_KEY)
   persnallyd import chatgpt <path>  Import a ChatGPT export dir or conversations.json (needs ANTHROPIC_API_KEY)
@@ -47,6 +55,90 @@ async function main(): Promise<void> {
   const [cmd, ...args] = process.argv.slice(2);
   applyApiKey();
   switch (cmd) {
+    case "setup": {
+      const port = parsePort(args);
+      console.log("Persnally setup — so every AI finally knows you.\n");
+
+      // 1. Extraction engine (optional — git-only works without one)
+      let engine = null;
+      try {
+        engine = await chooseExtractor("extract");
+        console.log(`✓ Extraction engine: ${engine.label}`);
+      } catch {
+        console.log("· No extraction engine (no API key, no Ollama) — conversation imports skipped, git still works.");
+      }
+
+      // 2. Daemon
+      if (!runningPid()) {
+        await startDetached(process.argv[1]!, port);
+        console.log(`✓ Daemon started (http://127.0.0.1:${port})`);
+      } else {
+        console.log("✓ Daemon already running");
+      }
+
+      // 3. Conversation exports from ~/Downloads (zipped or unzipped)
+      const store = new EventStore();
+      let imported = 0;
+      for (const found of detectExports()) {
+        if (alreadyImported(found.origin)) {
+          console.log(`· Skipping ${found.origin} (already imported)`);
+        } else if (engine) {
+          console.log(`→ Importing ${found.kind} export: ${found.origin}`);
+          const parsed = found.kind === "claude" ? parseClaudeExport(found.path) : parseChatGPTExport(found.path);
+          const result = found.kind === "claude"
+            ? await extractClaudeEvents(parsed, engine.extract, engine.model)
+            : await extractChatGPTEvents(parsed, engine.extract, engine.model);
+          store.append(result.events);
+          markImported(found.origin);
+          imported += result.events.length;
+          console.log(`  ✓ ${result.events.length} events`);
+        }
+        if (found.cleanup) rmSync(found.cleanup, { recursive: true, force: true });
+      }
+
+      // 4. Git activity from ~/Projects
+      const projects = join(homedir(), "Projects");
+      if (existsSync(projects) && !alreadyImported(projects)) {
+        const summaries = scanRepos(projects);
+        if (summaries.length) {
+          const { events } = gitEvents(summaries);
+          store.append(events);
+          markImported(projects);
+          imported += events.length;
+          console.log(`✓ Imported ${summaries.length} git repo(s) from ~/Projects (${events.length} events, fully offline)`);
+        }
+      }
+      store.rebuild();
+
+      // 5. Profile
+      if (engine && store.stats().total > 0) {
+        console.log("→ Synthesizing your profile…");
+        const profileEngine = await chooseExtractor("profile");
+        await synthesizeProfile(store, profileEngine.extract, profileEngine.model);
+        console.log("  ✓ Profile ready");
+      }
+      store.close();
+
+      // 6. AI clients
+      for (const { client, file } of connectAll()) {
+        console.log(file ? `✓ Connected ${client}` : `· ${client} not installed — skipped`);
+      }
+
+      console.log(`\nDone${imported ? ` — ${imported} events imported` : ""}. Dashboard: http://127.0.0.1:${port}`);
+      if (process.platform === "darwin" && process.stdout.isTTY) {
+        try { execFileSync("open", [`http://127.0.0.1:${port}`]); } catch { /* non-fatal */ }
+      }
+      return;
+    }
+    case "connect": {
+      const target = args[0] === "--all" || !args[0] ? null : (args[0] as Client);
+      if (target && !CLIENTS.includes(target)) return die(`unknown client — use ${CLIENTS.join(" | ")} | --all`);
+      const results = target ? [{ client: target, file: connectClient(target) }] : connectAll();
+      for (const { client, file } of results) {
+        console.log(file ? `Connected ${client} (${file})` : `${client} not installed — skipped`);
+      }
+      return;
+    }
     case "config": {
       if (args[0] === "set-key") {
         if (!args[1]?.startsWith("sk-ant-")) return die("expected an Anthropic key (sk-ant-...)");
