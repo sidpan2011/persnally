@@ -152,6 +152,9 @@ async function main(): Promise<void> {
         console.log(removeAutostart() ? "Autostart removed; daemon stopped." : "Autostart was not installed.");
         return;
       }
+      // A running daemon holds the pidfile and would put launchd in a retry loop — hand over first.
+      const stopped = await stopDaemon();
+      if (stopped) console.log(`Stopped existing daemon (pid ${stopped}) — launchd takes over.`);
       const plist = installAutostart(process.argv[1]!, parsePort(args));
       console.log(`Autostart installed (${plist}). The daemon now runs at login and restarts if it exits.`);
       return;
