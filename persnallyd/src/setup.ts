@@ -63,6 +63,66 @@ export function detectExports(searchDir = join(homedir(), "Downloads")): FoundEx
   return found;
 }
 
+// ── Density floor: never leave the user with an empty mirror ──
+
+import { z } from "zod";
+import { newEvent, PAYLOAD_SCHEMAS, type PersnallyEvent } from "./events.js";
+import type { ChosenExtractor } from "./llm.js";
+
+const THIN_SIGNAL_THRESHOLD = 15;
+
+export const DENSITY_QUESTIONS = [
+  "What are you working on right now?",
+  "What topics or technologies do you care most about these days?",
+] as const;
+
+export function isThin(signalCount: number): boolean {
+  return signalCount < THIN_SIGNAL_THRESHOLD;
+}
+
+const seedExtraction = z.object({ topics: z.array(PAYLOAD_SCHEMAS["signal.topic"]) });
+
+/** Turns free-text answers into seed events — via the engine when available,
+ *  else a deterministic phrase split so the key-free path still works. */
+export async function eventsFromAnswers(
+  answers: string[],
+  engine: ChosenExtractor | null,
+): Promise<PersnallyEvent[]> {
+  if (!answers.join("").replace(/[^a-zA-Z0-9]/g, "")) return [];
+  const text = answers.map((a, i) => `${DENSITY_QUESTIONS[i] ?? "Q"}: ${a}`).join("\n");
+
+  if (engine) {
+    const result = await engine.extract({
+      model: engine.model,
+      instruction:
+        "The user answered two onboarding questions about themselves. Extract 2-6 topic signals. Weight by how central each seems; intent 'building' for active work, 'learning'/'researching' for interests.",
+      schema: seedExtraction,
+      content: text,
+    });
+    return seedExtraction.parse(result).topics.map((t) =>
+      newEvent("signal.topic", "cli", t, { kind: "local", surface: "cli" }),
+    );
+  }
+
+  // Key-free fallback: comma/and-separated phrases become moderate signals.
+  const phrases = answers
+    .flatMap((a) => a.split(/,|\band\b|;/))
+    .map((p) => p.trim())
+    .filter((p) => p.length > 2 && p.length < 80 && /[a-zA-Z0-9]/.test(p))
+    .slice(0, 8);
+  return phrases.map((topic, i) =>
+    newEvent("signal.topic", "cli", {
+      topic,
+      weight: 0.6,
+      intent: i === 0 ? "building" : "discussing",
+      sentiment: "neutral",
+      depth: "moderate",
+      category: "other",
+      entities: [],
+    }, { kind: "local", surface: "cli" }),
+  );
+}
+
 export function alreadyImported(origin: string): boolean {
   const sources = loadConfig().imported_sources;
   return Array.isArray(sources) && sources.includes(origin);

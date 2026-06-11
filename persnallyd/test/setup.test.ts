@@ -46,3 +46,42 @@ test("empty or missing search dir yields nothing", () => {
   assert.deepEqual(detectExports(join(dir, "random-folder")), []);
   assert.deepEqual(detectExports(join(dir, "does-not-exist")), []);
 });
+
+// ── density floor ──
+
+test("isThin thresholds", async () => {
+  const { isThin } = await import("../src/setup.js");
+  assert.equal(isThin(0), true);
+  assert.equal(isThin(14), true);
+  assert.equal(isThin(15), false);
+});
+
+test("eventsFromAnswers without engine splits phrases deterministically", async () => {
+  const { eventsFromAnswers } = await import("../src/setup.js");
+  const events = await eventsFromAnswers(
+    ["building a local-first context engine, robotics", "rust and embedded systems"],
+    null,
+  );
+  const topics = events.map((e) => (e.payload as { topic: string }).topic);
+  assert.deepEqual(topics, ["building a local-first context engine", "robotics", "rust", "embedded systems"]);
+  assert.equal(events[0]!.source, "cli");
+  assert.deepEqual(events[0]!.provenance, { kind: "local", surface: "cli" });
+});
+
+test("eventsFromAnswers with engine extracts via LLM and validates", async () => {
+  const { eventsFromAnswers } = await import("../src/setup.js");
+  const events = await eventsFromAnswers(["working on persnally"], {
+    model: "mock",
+    label: "mock",
+    extract: async () => ({
+      topics: [{ topic: "persnally", weight: 0.9, intent: "building", sentiment: "positive", depth: "deep", category: "technology", entities: [] }],
+    }),
+  });
+  assert.equal(events.length, 1);
+  assert.equal((events[0]!.payload as { topic: string }).topic, "persnally");
+});
+
+test("eventsFromAnswers yields nothing for empty/punctuation answers", async () => {
+  const { eventsFromAnswers } = await import("../src/setup.js");
+  assert.deepEqual(await eventsFromAnswers(["", "  ...  "], null), []);
+});

@@ -28,7 +28,7 @@
 | Descriptive profile synthesis | ✅ Done (2026-06-11) | `persnallyd profile` → Fable 5 via structured outputs → `view_profile`, each section evidence-linked to event ids. Served at `GET /profile`. Real run produced a startling profile from structured events alone |
 | ChatGPT + git importers | ✅ Done (2026-06-11) | Shared extraction pipeline (`extract.ts`). ChatGPT: mapping-tree parser, fixture-tested (no real export on hand — verify on first real one). Git: fully deterministic/offline, repos→topics + manifests→skills, batch-undoable; real-run verified (persnally repo, 58 commits → top of graph at 0.73) |
 | Local dashboard | ✅ Done (2026-06-11) | Single static page served by the daemon at `localhost:4983` — profile with per-section "why does it think this?" provenance walk, decayed topic bars, per-topic hard-delete, re-synthesize button. No framework, no second app. 28 tests (daemon HTTP layer now covered) |
-| Signal-density floor | 🟡 Mostly done | Git importer (offline, key-free) covers the developer case; `setup` auto-imports ~/Projects. Remaining: 1–2 question fallback when everything is thin |
+| Signal-density floor | ✅ Done (2026-06-12) | Git importer covers developers; `setup` auto-imports ~/Projects; and when the store is still thin (<15 signals), setup asks 2 questions and seeds the graph — via the engine when present, deterministic phrase-split when key-free. The mirror is never empty |
 
 ## Phase 2 scoreboard (started early — entrance via MCP v2)
 
