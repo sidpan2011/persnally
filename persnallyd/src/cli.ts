@@ -12,6 +12,7 @@ import { applyApiKey, configPath, loadConfig, saveConfig } from "./config.js";
 import { CLIENTS, connectAll, connectClient, type Client } from "./connect.js";
 import { runConsolidation } from "./consolidate.js";
 import { chooseExtractor } from "./llm.js";
+import { CATEGORIES, clearScope, loadScopes, setScope, type Category } from "./permissions.js";
 import { alreadyImported, DENSITY_QUESTIONS, detectExports, eventsFromAnswers, isThin, markImported } from "./setup.js";
 import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
 import { extractChatGPTEvents, parseChatGPTExport } from "./importers/chatgpt.js";
@@ -29,6 +30,8 @@ const USAGE = `persnallyd ${VERSION} — so every AI finally knows you
 Usage:
   persnallyd setup                  One command: find exports, import, synthesize, connect, open
   persnallyd connect [client|--all] Add Persnally to claude-code | claude-desktop | cursor
+  persnallyd scope <client> <categories|--clear>   Limit what a client can read (e.g. scope cursor technology,career)
+  persnallyd scope                  Show all client scopes
   persnallyd init                   Create the local store (~/.persnally/persnally.db)
   persnallyd import claude <dir>    Import a Claude data export (needs ANTHROPIC_API_KEY)
   persnallyd import chatgpt <path>  Import a ChatGPT export dir or conversations.json (needs ANTHROPIC_API_KEY)
@@ -148,6 +151,27 @@ async function main(): Promise<void> {
       if (process.platform === "darwin" && process.stdout.isTTY) {
         try { execFileSync("open", [`http://127.0.0.1:${port}`]); } catch { /* non-fatal */ }
       }
+      return;
+    }
+    case "scope": {
+      const [client, spec] = args;
+      if (!client) {
+        const scopes = loadScopes();
+        const entries = Object.entries(scopes);
+        if (!entries.length) { console.log("No client scopes — every connected client sees everything."); return; }
+        for (const [c, cats] of entries) console.log(`${c}: ${cats.join(", ")}`);
+        return;
+      }
+      if (!spec) return die("usage: persnallyd scope <client> <cat1,cat2|--clear>");
+      if (spec === "--clear") {
+        console.log(clearScope(client) ? `Cleared scope for ${client} — it now sees everything.` : `${client} had no scope.`);
+        return;
+      }
+      const cats = spec.split(",").map((c) => c.trim()).filter(Boolean);
+      const invalid = cats.filter((c) => !CATEGORIES.includes(c as Category));
+      if (invalid.length) return die(`unknown categor${invalid.length > 1 ? "ies" : "y"}: ${invalid.join(", ")}\nvalid: ${CATEGORIES.join(", ")}`);
+      setScope(client, cats as Category[]);
+      console.log(`${client} can now read only: ${cats.join(", ")}. Restart that client to apply.`);
       return;
     }
     case "connect": {
