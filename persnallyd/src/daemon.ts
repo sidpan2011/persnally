@@ -5,6 +5,8 @@
 
 import http from "node:http";
 import { readFileSync } from "node:fs";
+import { loadConfig } from "./config.js";
+import { runConsolidation, shouldRunNow } from "./consolidate.js";
 import { newEvent, validateEvent, type EventType, type PersnallyEvent, type Provenance } from "./events.js";
 import { chooseExtractor } from "./llm.js";
 import { synthesizeProfile } from "./profile.js";
@@ -37,6 +39,10 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
       if (req.method === "POST" && url.pathname === "/synthesize") {
         const engine = await chooseExtractor("profile");
         return json(res, 200, await synthesizeProfile(store, engine.extract, engine.model));
+      }
+      if (req.method === "POST" && url.pathname === "/consolidate") {
+        const engine = await chooseExtractor("extract").catch(() => null);
+        return json(res, 200, await runConsolidation(store, engine));
       }
       if (req.method === "GET" && url.pathname === "/events") {
         const ids = url.searchParams.get("ids");
@@ -85,6 +91,22 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
     }
   });
   server.listen(port, "127.0.0.1");
+
+  // Nightly reflection: check every 30 min, run once per day at/after the consolidation hour.
+  const timer = setInterval(async () => {
+    const lastRun = loadConfig().last_consolidation;
+    if (!shouldRunNow(typeof lastRun === "string" ? lastRun : undefined, new Date())) return;
+    try {
+      const engine = await chooseExtractor("extract").catch(() => null);
+      const r = await runConsolidation(store, engine);
+      console.error(`consolidation: ${r.newSignals} new signals, ${r.assertions} assertions, profile ${r.profileRefreshed ? "refreshed" : "kept"}`);
+    } catch (e) {
+      console.error("consolidation failed:", e instanceof Error ? e.message : e);
+    }
+  }, 30 * 60 * 1000);
+  timer.unref();
+  server.on("close", () => clearInterval(timer));
+
   return server;
 }
 

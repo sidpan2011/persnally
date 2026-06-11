@@ -38,7 +38,7 @@
 | `persnally_context` read loop | ✅ Live | Any MCP client now gets the real profile + decayed topics |
 | Per-client permission scoping | ⬜ | All clients currently see everything |
 | `persnally connect <client>` one-command setup | ✅ Done (2026-06-12) | `persnallyd connect [client\|--all]` + full `persnallyd setup` onboarding (find exports → import → synthesize → connect → open dashboard) |
-| Nightly consolidation pass | ⬜ | From ARCHITECTURE.md — reflection + behavior assertions |
+| Nightly consolidation pass | ✅ Done (2026-06-12) | Daemon checks every 30min, reflects once/day at 3am local: refreshes decay, emits ≤3 `behavior` assertions (derived provenance) over new signals, re-synthesizes. `persnallyd consolidate` for manual runs. Real run: 82 signals → 3 assertions incl. a detected attention *shift* over time |
 
 ## Key findings log
 

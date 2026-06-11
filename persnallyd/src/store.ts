@@ -18,6 +18,7 @@ export interface QueryOpts {
   type?: string;
   source?: string;
   since?: string;
+  recordedSince?: string;
   limit?: number;
 }
 
@@ -128,6 +129,7 @@ export class EventStore {
     if (opts.type) { where.push("type = @type"); params.type = opts.type; }
     if (opts.source) { where.push("source = @source"); params.source = opts.source; }
     if (opts.since) { where.push("ts >= @since"); params.since = opts.since; }
+    if (opts.recordedSince) { where.push("recorded_at >= @recordedSince"); params.recordedSince = opts.recordedSince; }
     const sql = `SELECT * FROM events ${where.length ? "WHERE " + where.join(" AND ") : ""}
                  ORDER BY ts DESC LIMIT @limit`;
     params.limit = opts.limit ?? 100;
