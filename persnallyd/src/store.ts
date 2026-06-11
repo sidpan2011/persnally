@@ -134,6 +134,15 @@ export class EventStore {
     return this.db.prepare(sql).all(params).map(rowToEvent);
   }
 
+  getEvents(ids: string[]): PersnallyEvent[] {
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => "?").join(",");
+    return this.db
+      .prepare(`SELECT * FROM events WHERE id IN (${placeholders})`)
+      .all(...ids)
+      .map(rowToEvent);
+  }
+
   stats(): { total: number; byType: Record<string, number>; bySource: Record<string, number>; first: string | null; last: string | null } {
     const total = (this.db.prepare("SELECT COUNT(*) n FROM events").get() as { n: number }).n;
     const group = (col: string) =>

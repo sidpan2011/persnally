@@ -1,0 +1,93 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, before, test } from "node:test";
+import { startDaemon } from "../src/daemon.js";
+import { newEvent } from "../src/events.js";
+import { EventStore } from "../src/store.js";
+
+const PORT = 49831;
+const BASE = `http://127.0.0.1:${PORT}`;
+const dir = mkdtempSync(join(tmpdir(), "daemon-test-"));
+const store = new EventStore(join(dir, "test.db"));
+let server: ReturnType<typeof startDaemon>;
+
+const topicEvent = newEvent("signal.topic", "import:claude", {
+  topic: "rust", weight: 0.9, intent: "building", sentiment: "positive",
+  depth: "deep", category: "technology", entities: [],
+}, { kind: "import", batch: "b1", file: "conversations.json" });
+
+before(() => {
+  store.append([topicEvent]);
+  store.rebuild();
+  server = startDaemon(store, PORT);
+});
+after(() => { server.close(); store.close(); rmSync(dir, { recursive: true, force: true }); });
+
+test("GET / serves the dashboard", async () => {
+  const r = await fetch(BASE + "/");
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get("content-type") ?? "", /text\/html/);
+  assert.match(await r.text(), /persnally/);
+});
+
+test("GET /topics returns the derived view", async () => {
+  const topics = await (await fetch(BASE + "/topics")).json() as Array<{ topic_key: string }>;
+  assert.equal(topics[0]?.topic_key, "rust");
+});
+
+test("GET /events?ids= resolves provenance lookups", async () => {
+  const events = await (await fetch(`${BASE}/events?ids=${topicEvent.id},missing`)).json() as Array<{ id: string }>;
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.id, topicEvent.id);
+});
+
+test("POST /events validates and rejects garbage", async () => {
+  const r = await fetch(BASE + "/events", { method: "POST", body: JSON.stringify({ type: "signal.bogus" }) });
+  assert.equal(r.status, 400);
+});
+
+test("GET /profile is 404 before synthesis, 200 after save", async () => {
+  assert.equal((await fetch(BASE + "/profile")).status, 404);
+  store.saveProfile({ headline: "h", sections: [], generated_at: "2026-06-11T00:00:00Z", model: "test" });
+  assert.equal((await fetch(BASE + "/profile")).status, 200);
+});
+
+test("POST /events without id gets one assigned by the daemon", async () => {
+  const r = await fetch(BASE + "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "signal.topic",
+      source: "mcp:claude-code",
+      payload: {
+        topic: "sqlite", weight: 0.5, intent: "building", sentiment: "neutral",
+        depth: "moderate", category: "technology", entities: [],
+      },
+      provenance: { kind: "mcp", client: "claude-code" },
+    }),
+  });
+  assert.equal(r.status, 201);
+  const body = await r.json() as { inserted: number; ids: string[] };
+  assert.equal(body.inserted, 1);
+  assert.match(body.ids[0] ?? "", /^[0-9a-f-]{36}$/);
+});
+
+test("DELETE /events requires explicit confirmation, then wipes", async () => {
+  assert.equal((await fetch(BASE + "/events", { method: "DELETE" })).status, 400);
+  const r = await fetch(BASE + "/events?confirm=all", { method: "DELETE" });
+  assert.equal(r.status, 200);
+  const stats = await (await fetch(BASE + "/stats")).json() as { total: number };
+  assert.equal(stats.total, 0);
+  // Restore the fixture for the remaining tests.
+  store.append([topicEvent]);
+  store.rebuild();
+});
+
+test("DELETE /topics/:topic hard-deletes and rebuilds", async () => {
+  const r = await fetch(BASE + "/topics/" + encodeURIComponent("rust"), { method: "DELETE" });
+  const body = await r.json() as { deleted: number };
+  assert.equal(body.deleted, 1);
+  const topics = await (await fetch(BASE + "/topics")).json() as unknown[];
+  assert.equal(topics.length, 0);
+});

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Persnally — your context engine</title>
+<style>
+  :root {
+    --bg: #0d0e12; --panel: #14161c; --panel-2: #1a1d25; --line: #262a35;
+    --text: #e8eaf0; --dim: #8b92a5; --accent: #6ee7b7; --warn: #f87171;
+    --intent: #93c5fd;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 15px/1.6 -apple-system, "Segoe UI", system-ui, sans-serif;
+    max-width: 880px; margin: 0 auto; padding: 40px 24px 80px;
+  }
+  header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
+  h1 { font-size: 22px; letter-spacing: -0.3px; }
+  h1 span { color: var(--accent); }
+  .tagline { color: var(--dim); font-size: 14px; }
+  .stats { display: flex; gap: 24px; margin: 22px 0 34px; color: var(--dim); font-size: 13px; }
+  .stats b { color: var(--text); font-size: 17px; display: block; }
+  section { margin-bottom: 40px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.4px; color: var(--dim); margin-bottom: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-bottom: 12px; }
+  .headline { font-size: 17px; font-weight: 600; line-height: 1.5; }
+  .meta { color: var(--dim); font-size: 12px; margin-top: 8px; }
+  .sec-title { font-weight: 600; margin-bottom: 6px; }
+  .sec-body { color: #c6cad6; white-space: pre-wrap; }
+  .evidence-btn {
+    background: none; border: none; color: var(--accent); cursor: pointer;
+    font-size: 12px; padding: 0; margin-top: 10px; font-family: inherit;
+  }
+  .evidence { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 10px; display: none; }
+  .evidence.open { display: block; }
+  .ev-item { font-size: 12.5px; color: var(--dim); padding: 4px 0; }
+  .ev-item code { color: var(--intent); background: var(--panel-2); padding: 1px 6px; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; font-size: 14px; }
+  .bar { height: 6px; border-radius: 3px; background: var(--accent); min-width: 2px; }
+  .bar-cell { width: 120px; }
+  .cat { color: var(--dim); font-size: 12.5px; }
+  .neg { color: var(--warn); }
+  .del {
+    background: none; border: 1px solid var(--line); color: var(--dim); border-radius: 6px;
+    cursor: pointer; font-size: 11.5px; padding: 2px 9px;
+  }
+  .del:hover { color: var(--warn); border-color: var(--warn); }
+  .btn {
+    background: var(--accent); color: #07241a; border: none; border-radius: 8px;
+    padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 13.5px;
+  }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+  .empty { color: var(--dim); padding: 24px; text-align: center; }
+  footer { color: var(--dim); font-size: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>persnally<span>d</span></h1>
+    <div class="tagline">so every AI finally knows you · local-first, nothing leaves this machine</div>
+  </div>
+  <button class="btn" id="synthesize">Re-synthesize profile</button>
+</header>
+
+<div class="stats" id="stats"></div>
+
+<section>
+  <h2>Your profile — every claim traceable to evidence</h2>
+  <div id="profile"><div class="empty">Loading…</div></div>
+</section>
+
+<section>
+  <h2>Interest graph — decayed, weighted, deletable</h2>
+  <div class="card" style="padding:6px 14px"><table id="topics"></table></div>
+</section>
+
+<footer>
+  Stored at ~/.persnally/persnally.db · deleting a topic hard-deletes its events and everything derived from them ·
+  <code>persnallyd forget --all</code> erases everything
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function get(path) {
+  const r = await fetch(path);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+async function loadStats() {
+  const s = await get("/stats");
+  if (!s) return;
+  const span = s.first ? `${s.first.slice(0, 10)} → ${s.last.slice(0, 10)}` : "—";
+  $("stats").innerHTML = `
+    <div><b>${s.total}</b>events</div>
+    <div><b>${s.byType["signal.topic"] ?? 0}</b>topic signals</div>
+    <div><b>${s.byType["signal.assertion"] ?? 0}</b>assertions</div>
+    <div><b>${span}</b>covered</div>`;
+}
+
+async function loadProfile() {
+  const p = await get("/profile");
+  if (!p) {
+    $("profile").innerHTML = `<div class="card empty">No profile yet — import data, then hit “Re-synthesize profile”.</div>`;
+    return;
+  }
+  const sections = p.sections.map((s, i) => `
+    <div class="card">
+      <div class="sec-title">${esc(s.title)}</div>
+      <div class="sec-body">${esc(s.body)}</div>
+      ${s.evidence_event_ids.length ? `
+        <button class="evidence-btn" data-i="${i}">why does it think this? · ${s.evidence_event_ids.length} events</button>
+        <div class="evidence" id="ev-${i}" data-ids="${esc(s.evidence_event_ids.join(","))}"></div>` : ""}
+    </div>`).join("");
+  $("profile").innerHTML = `
+    <div class="card"><div class="headline">${esc(p.headline)}</div>
+    <div class="meta">generated ${esc(p.generated_at)} · ${esc(p.model)} · synthesized from structured events only</div></div>
+    ${sections}`;
+
+  document.querySelectorAll(".evidence-btn").forEach((btn) =>
+    btn.addEventListener("click", () => toggleEvidence(btn.dataset.i)));
+}
+
+async function toggleEvidence(i) {
+  const box = $(`ev-${i}`);
+  box.classList.toggle("open");
+  if (box.dataset.loaded || !box.classList.contains("open")) return;
+  const events = await get(`/events?ids=${box.dataset.ids}`) ?? [];
+  box.innerHTML = events.map((e) => {
+    const p = e.payload;
+    const summary = e.type === "signal.topic"
+      ? `${p.topic} (${p.intent}, ${p.sentiment})`
+      : p.claim ?? JSON.stringify(p).slice(0, 120);
+    const origin = e.provenance.kind === "import"
+      ? `${e.provenance.file}${e.provenance.conversation_uuid ? " · convo " + e.provenance.conversation_uuid.slice(0, 8) : ""}`
+      : e.provenance.kind;
+    return `<div class="ev-item"><code>${esc(e.type)}</code> ${esc(summary)} — <i>${esc(origin)}, ${esc(e.ts.slice(0, 10))}</i></div>`;
+  }).join("") || `<div class="ev-item">events not found (deleted?)</div>`;
+  box.dataset.loaded = "1";
+}
+
+async function loadTopics() {
+  const topics = await get("/topics?limit=40") ?? [];
+  const max = Math.max(...topics.map((t) => t.weight), 0.01);
+  $("topics").innerHTML = topics.map((t) => `
+    <tr>
+      <td class="bar-cell"><div class="bar" style="width:${Math.max((t.weight / max) * 100, 2)}%"></div></td>
+      <td>${esc(t.topic)}${t.sentiment_balance < -0.2 ? ' <span class="neg">▾</span>' : ""}</td>
+      <td class="cat">${esc(t.category)} · ${esc(t.dominant_intent)} · ${t.signals}×</td>
+      <td class="cat">${esc(t.last_seen.slice(0, 10))}</td>
+      <td><button class="del" data-topic="${esc(t.topic)}">forget</button></td>
+    </tr>`).join("") || `<tr><td class="empty">No topics yet — run an import.</td></tr>`;
+
+  document.querySelectorAll(".del").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      if (!confirm(`Hard-delete "${btn.dataset.topic}" and everything derived from it?`)) return;
+      await fetch(`/topics/${encodeURIComponent(btn.dataset.topic)}`, { method: "DELETE" });
+      loadTopics(); loadStats();
+    }));
+}
+
+$("synthesize").addEventListener("click", async () => {
+  const btn = $("synthesize");
+  btn.disabled = true; btn.textContent = "Synthesizing… (can take a minute)";
+  const r = await fetch("/synthesize", { method: "POST" });
+  if (!r.ok) alert((await r.json()).error ?? "synthesis failed");
+  btn.disabled = false; btn.textContent = "Re-synthesize profile";
+  loadProfile();
+});
+
+loadStats(); loadProfile(); loadTopics();
+</script>
+</body>
+</html>
