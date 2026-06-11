@@ -46,7 +46,7 @@ writeFileSync(join(home, ".persnally", "interest-graph.json"), JSON.stringify({
 
 await new Promise((r) => mockDaemon.listen(MOCK_PORT, "127.0.0.1", r));
 
-const srv = spawn("node", ["build/index.js"], {
+const srv = spawn("node", ["build/src/mcp/index.js"], {
   env: { ...process.env, HOME: home, PERSNALLYD_URL: `http://127.0.0.1:${MOCK_PORT}` },
   stdio: ["pipe", "pipe", "inherit"],
 });
