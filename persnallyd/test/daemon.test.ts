@@ -54,6 +54,36 @@ test("GET /profile is 404 before synthesis, 200 after save", async () => {
   assert.equal((await fetch(BASE + "/profile")).status, 200);
 });
 
+test("POST /events without id gets one assigned by the daemon", async () => {
+  const r = await fetch(BASE + "/events", {
+    method: "POST",
+    body: JSON.stringify({
+      type: "signal.topic",
+      source: "mcp:claude-code",
+      payload: {
+        topic: "sqlite", weight: 0.5, intent: "building", sentiment: "neutral",
+        depth: "moderate", category: "technology", entities: [],
+      },
+      provenance: { kind: "mcp", client: "claude-code" },
+    }),
+  });
+  assert.equal(r.status, 201);
+  const body = await r.json() as { inserted: number; ids: string[] };
+  assert.equal(body.inserted, 1);
+  assert.match(body.ids[0] ?? "", /^[0-9a-f-]{36}$/);
+});
+
+test("DELETE /events requires explicit confirmation, then wipes", async () => {
+  assert.equal((await fetch(BASE + "/events", { method: "DELETE" })).status, 400);
+  const r = await fetch(BASE + "/events?confirm=all", { method: "DELETE" });
+  assert.equal(r.status, 200);
+  const stats = await (await fetch(BASE + "/stats")).json() as { total: number };
+  assert.equal(stats.total, 0);
+  // Restore the fixture for the remaining tests.
+  store.append([topicEvent]);
+  store.rebuild();
+});
+
 test("DELETE /topics/:topic hard-deletes and rebuilds", async () => {
   const r = await fetch(BASE + "/topics/" + encodeURIComponent("rust"), { method: "DELETE" });
   const body = await r.json() as { deleted: number };
