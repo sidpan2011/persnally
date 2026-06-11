@@ -113,6 +113,7 @@ async function main(): Promise<void> {
       const store = new EventStore();
       startDaemon(store, port);
       console.error(`persnallyd v${VERSION} listening on 127.0.0.1:${port}`);
+      console.error(`Dashboard: http://127.0.0.1:${port}`);
       return;
     }
     default:
