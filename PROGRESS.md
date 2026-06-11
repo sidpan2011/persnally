@@ -30,6 +30,16 @@
 | Local dashboard | ✅ Done (2026-06-11) | Single static page served by the daemon at `localhost:4983` — profile with per-section "why does it think this?" provenance walk, decayed topic bars, per-topic hard-delete, re-synthesize button. No framework, no second app. 28 tests (daemon HTTP layer now covered) |
 | Signal-density floor | ⬜ | Fallback when import corpus is thin (Phase 0 finding) |
 
+## Phase 2 scoreboard (started early — entrance via MCP v2)
+
+| Deliverable | Status | Notes |
+|---|---|---|
+| MCP server as daemon client | ✅ Done (2026-06-11) | v2 rewrite: 4 tools (`track`/`context`/`interests`/`forget`), daemon is single source of truth, v1 graph auto-migration, protocol e2e vs mock daemon + live round-trip verified. Dual-source-of-truth debt eliminated |
+| `persnally_context` read loop | ✅ Live | Any MCP client now gets the real profile + decayed topics |
+| Per-client permission scoping | ⬜ | All clients currently see everything |
+| `persnally connect <client>` one-command setup | ⬜ | Friction here is fatal per PIVOT.md |
+| Nightly consolidation pass | ⬜ | From ARCHITECTURE.md — reflection + behavior assertions |
+
 ## Key findings log
 
 **2026-06-11 — Describe-me experiment (GO):**

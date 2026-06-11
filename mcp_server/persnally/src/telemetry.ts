@@ -17,6 +17,10 @@ export function setClient(name: string | undefined): void {
   if (name) clientName = name;
 }
 
+export function getClient(): string {
+  return clientName;
+}
+
 export function logEvent(event: string, data: Record<string, unknown> = {}): void {
   try {
     if (!existsSync(DIR)) mkdirSync(DIR, { recursive: true });
