@@ -51,7 +51,8 @@
 | 2026-06-11 | Event schema designed (`docs/EVENT_SCHEMA.md`) + this tracker |
 | 2026-06-11 | `persnallyd` skeleton: event store + Claude importer + CLI + daemon, 13 tests, e2e on real export (PR #13, merged) |
 | 2026-06-11 | Brand kit locked: pitch / tagline ("So every AI finally knows you") / descriptor ("The context engine for you") / competitive contrast — applied to CLI, packages, GitHub about |
-| 2026-06-11 | The Mirror loop complete: decay port + profile synthesis (`persnallyd profile`, `GET /profile`), 22 tests. Key learning: Fable 5 rejects forced tool_choice — moved all extraction to structured outputs (`messages.parse` + `zodOutputFormat`), deleting the hand-rolled schema converter |
+| 2026-06-11 | The Mirror loop complete: decay port + profile synthesis (`persnallyd profile`, `GET /profile`), 22 tests (PR #14, merged). Key learning: Fable 5 rejects forced tool_choice — moved all extraction to structured outputs (`messages.parse` + `zodOutputFormat`), deleting the hand-rolled schema converter |
+| 2026-06-11 | CI overhauled for v2: persnallyd job added (was zero CI), dead Docker job + Dockerfiles/compose deleted, API boot smoke check, concurrency cancellation. Full pipeline <1 min |
 
 ## Next up
 
