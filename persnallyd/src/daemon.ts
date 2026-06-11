@@ -6,6 +6,7 @@
 import http from "node:http";
 import { readFileSync } from "node:fs";
 import { newEvent, validateEvent, type EventType, type PersnallyEvent, type Provenance } from "./events.js";
+import { chooseExtractor } from "./llm.js";
 import { synthesizeProfile } from "./profile.js";
 import type { EventStore } from "./store.js";
 
@@ -34,10 +35,8 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
         return profile ? json(res, 200, profile) : json(res, 404, { error: "no profile synthesized yet" });
       }
       if (req.method === "POST" && url.pathname === "/synthesize") {
-        if (!process.env.ANTHROPIC_API_KEY) {
-          return json(res, 400, { error: "ANTHROPIC_API_KEY not set in the daemon's environment" });
-        }
-        return json(res, 200, await synthesizeProfile(store));
+        const engine = await chooseExtractor("profile");
+        return json(res, 200, await synthesizeProfile(store, engine.extract, engine.model));
       }
       if (req.method === "GET" && url.pathname === "/events") {
         const ids = url.searchParams.get("ids");
