@@ -22,7 +22,8 @@ async function request(path: string, init?: RequestInit): Promise<Response> {
 
 export async function daemonGet<T>(path: string): Promise<T | null> {
   const r = await request(path);
-  if (r.status === 404) return null;
+  // 404 = not present yet; 403 = scoped out for this client. Both mean "no data", not an error.
+  if (r.status === 404 || r.status === 403) return null;
   if (!r.ok) throw new Error(`daemon ${path}: ${r.status} ${await r.text()}`);
   return r.json() as Promise<T>;
 }
