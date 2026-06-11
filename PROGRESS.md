@@ -65,6 +65,8 @@
 | 2026-06-11 | CI overhauled for v2: persnallyd job added (was zero CI), dead Docker job + Dockerfiles/compose deleted, API boot smoke check, concurrency cancellation. Full pipeline <1 min |
 | 2026-06-11 | docs/ARCHITECTURE.md: eight invariants, learning model, behavioral-model trajectory + eval harness |
 | 2026-06-11 | Business doctrine locked: hybrid cloud-as-amplifier (never plaintext custody), FSL licensing + open spec, Pro value ladder (zero-setup inference → agent relay → reflection → behavior model). PIVOT.md Phase 4 + CLAUDE.md principle 7 |
+| 2026-06-12 | Importers complete: ChatGPT (mapping-tree parser) + git (deterministic/offline, repos→topics, manifests→skills), shared extraction pipeline (PR #17) |
+| 2026-06-12 | Daemon lifecycle: start/stop/pidfile/launchd autostart (PR #18). Live on machine #1 — launchd-owned, KeepAlive verified. Dogfooding caught the RunAtLoad-vs-running-daemon retry loop; autostart now hands over. Known gap: launchd daemon has no ANTHROPIC_API_KEY → config file needed (launch prep) |
 
 ## Next up
 
