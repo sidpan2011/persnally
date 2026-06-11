@@ -1,0 +1,90 @@
+/**
+ * Shared extraction pipeline for conversation-export importers.
+ * Parsers produce a ParsedExport; this turns it into provenance-linked events.
+ */
+
+import { z } from "zod";
+import { newEvent, uuidv7, PAYLOAD_SCHEMAS, type PersnallyEvent } from "../events.js";
+import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
+
+const MAX_CONVO_CHARS = 30_000;
+
+export interface ParsedConversation {
+  uuid: string;
+  name: string;
+  summary: string;
+  created_at: string;
+  userMessages: string[];
+}
+
+export interface ParsedExport {
+  conversations: ParsedConversation[];
+  memoryText: string;
+  projects: { name: string; description: string }[];
+}
+
+export interface ImportResult {
+  events: PersnallyEvent[];
+  batch: string;
+  conversationsProcessed: number;
+}
+
+const topicsExtraction = z.object({ topics: z.array(PAYLOAD_SCHEMAS["signal.topic"]) });
+const assertionsExtraction = z.object({ assertions: z.array(PAYLOAD_SCHEMAS["signal.assertion"]) });
+
+export async function extractEvents(
+  parsed: ParsedExport,
+  opts: { source: string; importer: string; file: string },
+  extract: LlmExtract = anthropicExtract,
+  model = DEFAULT_EXTRACT_MODEL,
+): Promise<ImportResult> {
+  const batch = uuidv7();
+  const events: PersnallyEvent[] = [];
+
+  for (const convo of parsed.conversations) {
+    if (!convo.userMessages.length) continue;
+    const text = convo.userMessages.join("\n").slice(0, MAX_CONVO_CHARS);
+    const result = await extract({
+      model,
+      instruction:
+        "Extract 1-5 topic signals from this conversation's user messages. Weight = centrality, depth = engagement level, sentiment = user's attitude toward the topic. Capture decisions and rejected options as their own signals.",
+      schema: topicsExtraction,
+      content: `Conversation title: ${convo.name}\n\nUser messages:\n${text}`,
+    });
+    const { topics } = topicsExtraction.parse(result);
+    for (const t of topics) {
+      events.push(newEvent("signal.topic", opts.source, t,
+        { kind: "import", batch, file: opts.file, conversation_uuid: convo.uuid },
+        new Date(convo.created_at).toISOString(),
+      ));
+    }
+  }
+
+  if (parsed.memoryText.trim() || parsed.projects.length) {
+    const context = [
+      parsed.memoryText.trim() && `Assistant's accumulated memory of the user:\n${parsed.memoryText}`,
+      parsed.projects.length && `User-created projects:\n${parsed.projects.map((p) => `- ${p.name}: ${p.description}`).join("\n")}`,
+    ].filter(Boolean).join("\n\n");
+    const result = await extract({
+      model,
+      instruction:
+        "Extract structured assertions about this person: facts, preferences, behaviors, skills, and context. Confidence reflects how directly the source supports the claim.",
+      schema: assertionsExtraction,
+      content: context,
+    });
+    const { assertions } = assertionsExtraction.parse(result);
+    for (const a of assertions) {
+      events.push(newEvent("signal.assertion", opts.source, a, { kind: "import", batch, file: opts.file }));
+    }
+  }
+
+  const span = parsed.conversations.map((c) => c.created_at).sort();
+  events.push(newEvent("system.import", "system", {
+    importer: opts.importer,
+    batch,
+    events: events.length,
+    ...(span.length ? { source_span: [span[0]!, span[span.length - 1]!] } : {}),
+  }, { kind: "import", batch, file: opts.file }));
+
+  return { events, batch, conversationsProcessed: parsed.conversations.length };
+}

@@ -5,7 +5,9 @@
  */
 
 import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
-import { parseClaudeExport, extractEvents } from "./importers/claude.js";
+import { extractChatGPTEvents, parseChatGPTExport } from "./importers/chatgpt.js";
+import { extractClaudeEvents, parseClaudeExport } from "./importers/claude.js";
+import { gitEvents, scanRepos } from "./importers/git.js";
 import { renderProfile, synthesizeProfile } from "./profile.js";
 import { DEFAULT_DB_PATH, EventStore } from "./store.js";
 
@@ -14,6 +16,8 @@ const USAGE = `persnallyd ${VERSION} — so every AI finally knows you
 Usage:
   persnallyd init                   Create the local store (~/.persnally/persnally.db)
   persnallyd import claude <dir>    Import a Claude data export (needs ANTHROPIC_API_KEY)
+  persnallyd import chatgpt <path>  Import a ChatGPT export dir or conversations.json (needs ANTHROPIC_API_KEY)
+  persnallyd import git <path> [--author <email>]   Import repo activity (offline, no LLM); path = repo or folder of repos
   persnallyd profile                Synthesize your profile from the store (needs ANTHROPIC_API_KEY)
   persnallyd show [topics|events|profile]   Show topics (default), recent events, or the profile
   persnallyd forget <topic>         Hard-delete a topic and everything derived from it
@@ -33,15 +37,25 @@ async function main(): Promise<void> {
       return;
     }
     case "import": {
-      const [kind, dir] = args;
-      if (kind !== "claude" || !dir) return die("usage: persnallyd import claude <export-dir>");
-      if (!process.env.ANTHROPIC_API_KEY) return die("ANTHROPIC_API_KEY is required for extraction");
-      const parsed = parseClaudeExport(dir);
-      console.error(
-        `Parsed ${parsed.conversations.length} conversations, ` +
-        `${parsed.projects.length} projects, memory: ${parsed.memoryText.length} chars. Extracting...`,
-      );
-      const { events, batch } = await extractEvents(parsed);
+      const [kind, path] = args;
+      if (!kind || !path) return die("usage: persnallyd import claude|chatgpt|git <path>");
+
+      let events, batch;
+      if (kind === "git") {
+        const authorIdx = args.indexOf("--author");
+        const summaries = scanRepos(path, authorIdx > -1 ? args[authorIdx + 1] : undefined);
+        if (!summaries.length) return die(`No git repos with your commits found at ${path}`);
+        console.error(`Found ${summaries.length} repo(s): ${summaries.map((s) => `${s.repo} (${s.commits} commits)`).join(", ")}`);
+        ({ events, batch } = gitEvents(summaries));
+      } else if (kind === "claude" || kind === "chatgpt") {
+        if (!process.env.ANTHROPIC_API_KEY) return die("ANTHROPIC_API_KEY is required for extraction");
+        const parsed = kind === "claude" ? parseClaudeExport(path) : parseChatGPTExport(path);
+        console.error(`Parsed ${parsed.conversations.length} conversations. Extracting...`);
+        ({ events, batch } = kind === "claude" ? await extractClaudeEvents(parsed) : await extractChatGPTEvents(parsed));
+      } else {
+        return die(`unknown import source "${kind}" — use claude, chatgpt, or git`);
+      }
+
       const store = new EventStore();
       store.append(events);
       store.rebuild();
