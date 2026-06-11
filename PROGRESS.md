@@ -36,7 +36,7 @@
 |---|---|---|
 | MCP server as daemon client | ✅ Done (2026-06-11) | v2 rewrite: 4 tools (`track`/`context`/`interests`/`forget`), daemon is single source of truth, v1 graph auto-migration, protocol e2e vs mock daemon + live round-trip verified. Dual-source-of-truth debt eliminated |
 | `persnally_context` read loop | ✅ Live | Any MCP client now gets the real profile + decayed topics |
-| Per-client permission scoping | ⬜ | All clients currently see everything |
+| Per-client permission scoping | ✅ Done (2026-06-12) | Category allowlists per client, default-open, enforced at the daemon (`/topics` filtered, `/profile` 403 for scoped clients). `persnallyd scope <client> <cats\|--clear>`. Real run: cursor scoped to technology,career saw exactly those + profile 403 |
 | `persnally connect <client>` one-command setup | ✅ Done (2026-06-12) | `persnallyd connect [client\|--all]` + full `persnallyd setup` onboarding (find exports → import → synthesize → connect → open dashboard) |
 | Nightly consolidation pass | ✅ Done (2026-06-12) | Daemon checks every 30min, reflects once/day at 3am local: refreshes decay, emits ≤3 `behavior` assertions (derived provenance) over new signals, re-synthesizes. `persnallyd consolidate` for manual runs. Real run: 82 signals → 3 assertions incl. a detected attention *shift* over time |
 

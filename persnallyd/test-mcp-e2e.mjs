@@ -25,9 +25,10 @@ const mockDaemon = http.createServer((req, res) => {
       received.deletes.push(req.url);
       return respond(200, { deleted: 1 });
     }
-    if (req.url === "/profile") return respond(200, { headline: "A builder", sections: [{ title: "Work", body: "Ships fast." }], generated_at: "2026-06-11" });
-    if (req.url?.startsWith("/topics")) return respond(200, [{ topic: "rust", category: "technology", weight: 0.9, signals: 3, dominant_intent: "building", sentiment_balance: 0.5, entities: [] }]);
-    if (req.url === "/stats") return respond(200, { total: 4, first: "2026-01-01", last: "2026-06-11" });
+    const path = (req.url ?? "").split("?")[0];
+    if (path === "/profile") return respond(200, { headline: "A builder", sections: [{ title: "Work", body: "Ships fast." }], generated_at: "2026-06-11" });
+    if (path === "/topics") return respond(200, [{ topic: "rust", category: "technology", weight: 0.9, signals: 3, dominant_intent: "building", sentiment_balance: 0.5, entities: [] }]);
+    if (path === "/stats") return respond(200, { total: 4, first: "2026-01-01", last: "2026-06-11" });
     respond(404, { error: "not found" });
   });
 });
