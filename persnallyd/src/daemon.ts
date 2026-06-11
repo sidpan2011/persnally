@@ -1,10 +1,12 @@
 /**
- * Local HTTP API — loopback only, the single access path to the event store.
+ * Local HTTP API + dashboard — loopback only, the single access path to the event store.
  * Phase 2's MCP context server will be a client of this API.
  */
 
 import http from "node:http";
+import { readFileSync } from "node:fs";
 import { validateEvent, type PersnallyEvent } from "./events.js";
+import { synthesizeProfile } from "./profile.js";
 import type { EventStore } from "./store.js";
 
 export const DEFAULT_PORT = 4983;
@@ -14,6 +16,10 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
     try {
+      if (req.method === "GET" && url.pathname === "/") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        return res.end(dashboardHtml());
+      }
       if (req.method === "GET" && url.pathname === "/health") {
         return json(res, 200, { ok: true, version: VERSION });
       }
@@ -27,7 +33,15 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
         const profile = store.getProfile();
         return profile ? json(res, 200, profile) : json(res, 404, { error: "no profile synthesized yet" });
       }
+      if (req.method === "POST" && url.pathname === "/synthesize") {
+        if (!process.env.ANTHROPIC_API_KEY) {
+          return json(res, 400, { error: "ANTHROPIC_API_KEY not set in the daemon's environment" });
+        }
+        return json(res, 200, await synthesizeProfile(store));
+      }
       if (req.method === "GET" && url.pathname === "/events") {
+        const ids = url.searchParams.get("ids");
+        if (ids) return json(res, 200, store.getEvents(ids.split(",").filter(Boolean)));
         return json(res, 200, store.query({
           type: url.searchParams.get("type") ?? undefined,
           source: url.searchParams.get("source") ?? undefined,
@@ -42,6 +56,11 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
         store.rebuild();
         return json(res, 201, { inserted: events.length });
       }
+      if (req.method === "DELETE" && url.pathname.startsWith("/topics/")) {
+        const topic = decodeURIComponent(url.pathname.slice("/topics/".length));
+        if (!topic) return json(res, 400, { error: "topic required" });
+        return json(res, 200, { deleted: store.forgetTopic(topic) });
+      }
       return json(res, 404, { error: "not found" });
     } catch (e) {
       return json(res, 400, { error: e instanceof Error ? e.message : "bad request" });
@@ -49,6 +68,12 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
   });
   server.listen(port, "127.0.0.1");
   return server;
+}
+
+let cachedHtml: string | undefined;
+function dashboardHtml(): string {
+  cachedHtml ??= readFileSync(new URL("./dashboard.html", import.meta.url), "utf-8");
+  return cachedHtml;
 }
 
 function json(res: http.ServerResponse, status: number, body: unknown): void {

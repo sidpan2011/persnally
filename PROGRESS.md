@@ -27,7 +27,7 @@
 | Decay/extraction port from interest-engine | ✅ Done (2026-06-11) | `decay.ts`: per-signal decay (fixes raw_weight double-count + dominant-intent bug). Verified on real data: stale March topics correctly decayed below fresh June ones |
 | Descriptive profile synthesis | ✅ Done (2026-06-11) | `persnallyd profile` → Fable 5 via structured outputs → `view_profile`, each section evidence-linked to event ids. Served at `GET /profile`. Real run produced a startling profile from structured events alone |
 | ChatGPT + git importers | ⬜ | git importer reuses `skill_analyzer` logic |
-| Local dashboard | ⬜ | The trust surface and screenshot moment |
+| Local dashboard | ✅ Done (2026-06-11) | Single static page served by the daemon at `localhost:4983` — profile with per-section "why does it think this?" provenance walk, decayed topic bars, per-topic hard-delete, re-synthesize button. No framework, no second app. 28 tests (daemon HTTP layer now covered) |
 | Signal-density floor | ⬜ | Fallback when import corpus is thin (Phase 0 finding) |
 
 ## Key findings log
