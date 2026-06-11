@@ -10,6 +10,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { applyApiKey, configPath, loadConfig, saveConfig } from "./config.js";
 import { CLIENTS, connectAll, connectClient, type Client } from "./connect.js";
+import { runConsolidation } from "./consolidate.js";
 import { chooseExtractor } from "./llm.js";
 import { alreadyImported, DENSITY_QUESTIONS, detectExports, eventsFromAnswers, isThin, markImported } from "./setup.js";
 import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
@@ -32,7 +33,8 @@ Usage:
   persnallyd import claude <dir>    Import a Claude data export (needs ANTHROPIC_API_KEY)
   persnallyd import chatgpt <path>  Import a ChatGPT export dir or conversations.json (needs ANTHROPIC_API_KEY)
   persnallyd import git <path> [--author <email>]   Import repo activity (offline, no LLM); path = repo or folder of repos
-  persnallyd profile                Synthesize your profile from the store (needs ANTHROPIC_API_KEY)
+  persnallyd profile                Synthesize your profile from the store
+  persnallyd consolidate            Reflect now: refresh decay, add behavior patterns, re-synthesize
   persnallyd show [topics|events|profile]   Show topics (default), recent events, or the profile
   persnallyd forget <topic>         Hard-delete a topic and everything derived from it
   persnallyd forget --all           Delete all data
@@ -204,6 +206,14 @@ async function main(): Promise<void> {
       store.close();
       console.log(`Imported ${events.length} events (batch ${batch}).`);
       console.log(`Undo with: persnallyd forget --batch ${batch}`);
+      return;
+    }
+    case "consolidate": {
+      const engine = await chooseExtractor("extract").catch(() => null);
+      const store = new EventStore();
+      const r = await runConsolidation(store, engine);
+      store.close();
+      console.log(`Consolidation: ${r.newSignals} new signal(s) since last run, ${r.assertions} behavior assertion(s) added, profile ${r.profileRefreshed ? "refreshed" : "unchanged"}.`);
       return;
     }
     case "profile": {
