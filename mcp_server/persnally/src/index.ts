@@ -1,379 +1,185 @@
 #!/usr/bin/env node
 
 /**
- * Persnally MCP Server
+ * Persnally MCP server — the protocol adapter between AI clients and persnallyd.
  *
- * An AI-native personalized intelligence engine that learns from your conversations.
- *
- * How it works:
- * 1. You install this as an MCP server in Claude/ChatGPT
- * 2. As you chat, the AI calls `persnally_track` to note what you're interested in
- * 3. Persnally builds an interest graph locally (no raw messages stored)
- * 4. Daily/weekly, it curates a personalized digest and emails it via Resend
- *
- * Tools exposed:
- * - persnally_track: Track topics from the current conversation
- * - persnally_interests: View your current interest graph
- * - persnally_digest: Trigger a digest generation
- * - persnally_config: Configure email, frequency, preferences
- * - persnally_forget: Remove a topic or clear all data
- *
- * Privacy: Only structured signals are stored (topic, weight, category).
- * Raw conversations NEVER leave your machine. Fully open source.
+ * The daemon owns all state (invariant: one write path, one source of truth);
+ * this server translates MCP tool calls into daemon HTTP calls. Claude IS the
+ * NLP engine: it fills persnally_track's structured schema from conversation
+ * context, so signal extraction costs zero extra inference.
  */
 
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { InterestEngine, TopicSignal } from "./interest-engine.js";
-import { DigestClient } from "./digest-client.js";
-import { logEvent, setClient } from "./telemetry.js";
+import { DAEMON_HINT, DaemonUnreachable, daemonDelete, daemonGet, daemonPost } from "./daemon-client.js";
+import { migrateV1Graph } from "./migrate-v1.js";
+import { getClient, logEvent, setClient } from "./telemetry.js";
 
-const engine = new InterestEngine();
-const digestClient = new DigestClient();
+const server = new McpServer({ name: "persnally", version: "2.0.0" });
 
-const server = new McpServer({
-  name: "persnally",
-  version: "1.0.0",
-});
+interface TopicRow {
+  topic: string;
+  category: string;
+  weight: number;
+  signals: number;
+  dominant_intent: string;
+  sentiment_balance: number;
+  entities: string[];
+}
 
-// ============================================================
-// TOOL: persnally_track
-// This is the core tool. Claude calls this during/after conversations
-// to report what topics the user is interested in.
-//
-// KEY INSIGHT: Claude IS the NLP engine. We don't need to parse
-// conversations ourselves — Claude already understands the context
-// and fills in structured data as tool parameters. Zero extra AI cost.
-// ============================================================
+interface Profile {
+  headline: string;
+  sections: { title: string; body: string }[];
+  generated_at: string;
+}
+
+function text(s: string) {
+  return { content: [{ type: "text" as const, text: s }] };
+}
+
+async function guarded(fn: () => Promise<{ content: { type: "text"; text: string }[] }>) {
+  try {
+    return await fn();
+  } catch (e) {
+    return text(e instanceof DaemonUnreachable ? DAEMON_HINT : `Persnally error: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+// ── persnally_track — write path ────────────────────────────
 
 server.tool(
   "persnally_track",
-  `Track topics and interests from the current conversation to build a personalized intelligence profile.
+  `Track topics and interests from the current conversation to build the user's personal context.
 
-Call this tool when the user discusses topics they care about. Extract the key themes, technologies, concepts, or interests from the conversation.
+Call this when the user discusses topics they care about — and when they make a decision, accept or reject an option, or express a clear preference, capture that as its own signal rather than folding it into a broader topic.
 
-IMPORTANT GUIDELINES:
-- Extract 1-5 topics per conversation, focusing on what the user is ACTIVELY engaged with
-- Weight reflects how central this topic is to the conversation (0.1 = briefly mentioned, 1.0 = main focus)
-- Depth: "mention" = just referenced, "moderate" = discussed in some detail, "deep" = extensive discussion or problem-solving
-- Sentiment: "negative" means the user is frustrated with or dislikes the topic (e.g., "I hate CSS")
-- Category should be one of: technology, business, finance, career, health, science, creative, education, lifestyle, news, other
-- Entities are specific names: "Next.js" not "web framework", "YC" not "accelerator"
+GUIDELINES:
+- Extract 1-5 signals per conversation, focused on what the user is ACTIVELY engaged with
+- Weight = how central to the conversation (0.1 brief, 1.0 main focus)
+- Depth: "mention" | "moderate" | "deep" (extensive discussion or problem-solving)
+- Sentiment: "negative" means frustration or dislike (deprioritizes, never boosts)
+- Entities are specific names: "Next.js" not "web framework"
 
-The user has explicitly opted in to having their conversation topics tracked for personalized content curation. No raw messages are stored — only structured topic signals.`,
+The user opted in. Only structured signals are stored, locally, never raw messages.`,
   {
     topics: z.array(z.object({
-      topic: z.string().describe("The topic or interest (e.g., 'SaaS pricing strategies', 'Rust async programming', 'index fund investing')"),
-      weight: z.number().min(0).max(1).describe("How central this topic is to the conversation (0.1 = brief mention, 1.0 = main focus)"),
-      intent: z.enum(["learning", "building", "researching", "deciding", "discussing", "debugging"]).describe("What the user is doing with this topic"),
-      sentiment: z.enum(["positive", "negative", "neutral"]).describe("User's sentiment toward this topic"),
-      depth: z.enum(["mention", "moderate", "deep"]).describe("How deeply the user engaged with this topic"),
-      category: z.enum(["technology", "business", "finance", "career", "health", "science", "creative", "education", "lifestyle", "news", "other"]).describe("Topic category"),
-      entities: z.array(z.string()).describe("Specific entities mentioned: tool names, company names, people, concepts"),
-    })).min(1).describe("Array of topics extracted from the current conversation"),
+      topic: z.string().describe("The topic, decision, or preference (e.g. 'Rust async programming', 'chose SQLite over Postgres')"),
+      weight: z.number().min(0).max(1),
+      intent: z.enum(["learning", "building", "researching", "deciding", "discussing", "debugging"]),
+      sentiment: z.enum(["positive", "negative", "neutral"]),
+      depth: z.enum(["mention", "moderate", "deep"]),
+      category: z.enum(["technology", "business", "finance", "career", "health", "science", "creative", "education", "lifestyle", "news", "other"]),
+      entities: z.array(z.string()),
+    })).min(1),
   },
-  async ({ topics }) => {
-    const signals: TopicSignal[] = topics.map(t => ({
-      ...t,
-      timestamp: new Date().toISOString(),
-    }));
-
-    const result = engine.processSignals(signals);
-    logEvent("tool_call", { tool: "persnally_track", topics: topics.length });
-
-    return {
-      content: [{
-        type: "text" as const,
-        text: `Tracked ${result.tracked} topic(s): ${result.topics.join(", ")}.\n\nYour interest profile is being updated. These signals will help curate your personalized digest.`,
-      }],
-    };
-  }
+  async ({ topics }) =>
+    guarded(async () => {
+      logEvent("tool_call", { tool: "persnally_track", topics: topics.length });
+      const client = getClient().toLowerCase().replace(/[^a-z0-9._-]/g, "-");
+      const events = topics.map((t) => ({
+        type: "signal.topic",
+        source: `mcp:${client}`,
+        payload: t,
+        provenance: { kind: "mcp", client },
+      }));
+      await daemonPost("/events", events);
+      return text(`Recorded ${topics.length} signal(s): ${topics.map((t) => t.topic).join(", ")}.`);
+    }),
 );
 
-// ============================================================
-// TOOL: persnally_interests
-// Shows the user what Persnally knows about them
-// ============================================================
+// ── persnally_context — read path (the Phase 2 core) ────────
+
+server.tool(
+  "persnally_context",
+  `Get the user's personal context: who they are, what they're working on, and their current interests.
+
+Call this at the START of a conversation (or when personalization would improve your answer) so your responses fit this specific user instead of a generic one.`,
+  {
+    detail: z.enum(["brief", "full"]).optional().default("brief"),
+  },
+  async ({ detail }) =>
+    guarded(async () => {
+      logEvent("tool_call", { tool: "persnally_context", detail });
+      const [profile, topics] = await Promise.all([
+        daemonGet<Profile>("/profile"),
+        daemonGet<TopicRow[]>(`/topics?limit=${detail === "full" ? 25 : 10}`),
+      ]);
+      if (!profile && !topics?.length) {
+        return text("No context yet — the user hasn't imported data or tracked any signals.");
+      }
+      let out = "";
+      if (profile) {
+        out += `# About this user\n${profile.headline}\n\n`;
+        const sections = detail === "full" ? profile.sections : profile.sections.slice(0, 3);
+        out += sections.map((s) => `## ${s.title}\n${s.body}`).join("\n\n");
+      }
+      if (topics?.length) {
+        out += `\n\n# Current interests (decay-weighted)\n`;
+        out += topics.map((t) => `- ${t.topic} (${t.category}, ${t.dominant_intent}, weight ${t.weight.toFixed(2)})`).join("\n");
+      }
+      return text(out);
+    }),
+);
+
+// ── persnally_interests — transparency view ─────────────────
 
 server.tool(
   "persnally_interests",
-  `Show the user's current interest profile — what Persnally has learned from their conversations.
-
-Call this when the user asks about their profile, interests, or what Persnally knows about them. Also useful for transparency — users can see exactly what data is stored.`,
-  {
-    detail: z.enum(["summary", "full"]).optional().default("summary").describe("Level of detail to show"),
-  },
-  async ({ detail }) => {
-    logEvent("tool_call", { tool: "persnally_interests" });
-    const stats = engine.getStats();
-
-    if (stats.total_signals === 0) {
-      return {
-        content: [{
-          type: "text" as const,
-          text: "No interests tracked yet. As we chat about topics you care about, I'll build your personalized profile. You can also say \"track this\" during any conversation.",
-        }],
-      };
-    }
-
-    const interests = engine.getTopInterests(detail === "full" ? 30 : 10);
-    const config = engine.getConfig();
-
-    let text = `## Your Interest Profile\n\n`;
-    text += `**${stats.active_topics}** active topics from **${stats.total_conversations}** conversations (${stats.total_signals} signals)\n`;
-    text += `Tracking since: ${new Date(stats.data_since).toLocaleDateString()}\n`;
-    text += `Digest email: ${config.email || "Not configured"}\n\n`;
-
-    // Group by category
-    const byCategory: Record<string, typeof interests> = {};
-    for (const interest of interests) {
-      const cat = interest.category;
-      if (!byCategory[cat]) byCategory[cat] = [];
-      byCategory[cat].push(interest);
-    }
-
-    for (const [category, items] of Object.entries(byCategory)) {
-      text += `### ${category.charAt(0).toUpperCase() + category.slice(1)}\n`;
-      for (const item of items) {
-        // current_weight is capped at 10 in calculateDecayedWeight, so clamp the
-        // bar to [0, 5] cells — otherwise `.repeat()` gets a negative count and throws.
-        const filled = Math.max(0, Math.min(5, Math.round(item.current_weight * 5)));
-        const weightBar = "█".repeat(filled) + "░".repeat(5 - filled);
-        const sentiment = item.sentiment_balance > 0.2 ? "+" : item.sentiment_balance < -0.2 ? "-" : "~";
-        text += `- ${item.topic} [${weightBar}] (${item.dominant_intent}, ${sentiment}) — ${item.frequency}x\n`;
-        if (detail === "full" && item.entities.length > 0) {
-          text += `  Entities: ${item.entities.slice(0, 5).join(", ")}\n`;
-        }
+  `Show the user their own tracked interest profile — what Persnally has learned. Use when the user asks what Persnally knows about them.`,
+  {},
+  async () =>
+    guarded(async () => {
+      logEvent("tool_call", { tool: "persnally_interests" });
+      const [stats, topics] = await Promise.all([
+        daemonGet<{ total: number; first: string | null; last: string | null }>("/stats"),
+        daemonGet<TopicRow[]>("/topics?limit=20"),
+      ]);
+      if (!topics?.length) return text("Nothing tracked yet. Chat naturally, or import your AI history with `persnallyd import`.");
+      let out = `## Your interest profile\n${stats?.total ?? 0} events, ${topics.length} top topics. Dashboard: http://127.0.0.1:4983\n\n`;
+      for (const t of topics) {
+        const sentiment = t.sentiment_balance > 0.2 ? "+" : t.sentiment_balance < -0.2 ? "−" : "·";
+        out += `- ${t.topic} — ${t.weight.toFixed(2)} (${t.category}, ${t.dominant_intent}, ${sentiment}, ${t.signals}×)\n`;
       }
-      text += "\n";
-    }
-
-    return { content: [{ type: "text" as const, text }] };
-  }
+      return text(out);
+    }),
 );
 
-// ============================================================
-// TOOL: persnally_digest
-// Generates the interest summary for digest curation
-// ============================================================
-
-server.tool(
-  "persnally_digest",
-  `Generate a digest request based on the user's interest profile.
-
-This produces a structured summary of what the user cares about, balanced across categories, that can be sent to the Persnally curation API to generate a personalized email digest.
-
-Call this when the user asks for their digest, or it can be triggered automatically.`,
-  {
-    preview: z.boolean().optional().default(false).describe("If true, show what the digest would contain without sending"),
-  },
-  async ({ preview }) => {
-    logEvent("tool_call", { tool: "persnally_digest", preview });
-    const stats = engine.getStats();
-    if (stats.total_signals === 0) {
-      return {
-        content: [{
-          type: "text" as const,
-          text: "Not enough data to generate a digest yet. Keep chatting and I'll track your interests!",
-        }],
-      };
-    }
-
-    const config = engine.getConfig();
-    const balanced = engine.getBalancedInterests(config.max_items);
-    const summary = engine.getGraphSummary();
-
-    let text = "";
-
-    if (preview) {
-      text += `## Digest Preview\n\n`;
-      text += `Based on your interest profile, here's what your next digest would cover:\n\n`;
-
-      for (const [category, data] of Object.entries(balanced)) {
-        text += `**${category}** (${data.allocation} items):\n`;
-        for (const interest of data.interests) {
-          text += `- ${interest.topic} (weight: ${interest.current_weight.toFixed(2)}, intent: ${interest.dominant_intent})\n`;
-        }
-        text += "\n";
-      }
-
-      if (!config.email) {
-        text += `\n⚠️ No email configured. Use persnally_config to set your email address.`;
-      }
-    } else {
-      // Build digest payload and send to API
-      const digestPayload = {
-        email: config.email,
-        interest_graph: summary,
-        balanced_allocation: Object.fromEntries(
-          Object.entries(balanced).map(([cat, data]) => [
-            cat,
-            {
-              allocation: data.allocation,
-              topics: data.interests.map(i => ({
-                topic: i.topic,
-                weight: i.current_weight,
-                intent: i.dominant_intent,
-                entities: i.entities.slice(0, 5),
-              })),
-            },
-          ])
-        ),
-        preferences: {
-          max_items: config.max_items,
-          frequency: config.frequency,
-        },
-      };
-
-      if (!config.email) {
-        text += `Cannot send digest — no email configured. Use persnally_config to set your email.\n\n`;
-        text += `Here's what would be sent:\n${JSON.stringify(digestPayload, null, 2)}`;
-      } else {
-        // Send to API
-        const result = await digestClient.requestDigest(digestPayload);
-        if (result) {
-          text += `Digest requested! Job ID: ${result.job_id} (status: ${result.status})\n\n`;
-          text += `Your personalized digest is being generated and will be sent to ${config.email}.\n`;
-          text += `It includes ${stats.active_topics} topics across ${Object.keys(balanced).length} categories.`;
-        } else {
-          text += `Digest generation is not configured (no API key set).\n\n`;
-          text += `To enable automatic digest emails:\n`;
-          text += `1. Set PERSNALLY_API_KEY in your environment, or\n`;
-          text += `2. Configure api_key via persnally_config\n\n`;
-          text += `Your interest data (shown below) is ready for when you connect:\n`;
-          text += JSON.stringify(digestPayload, null, 2);
-        }
-      }
-    }
-
-    return { content: [{ type: "text" as const, text }] };
-  }
-);
-
-// ============================================================
-// TOOL: persnally_config
-// Configure email, frequency, preferences
-// ============================================================
-
-server.tool(
-  "persnally_config",
-  `Configure Persnally settings — email address, digest frequency, and preferences.
-
-Call this when the user wants to set up or change their Persnally configuration. The email address is required for receiving digests.`,
-  {
-    email: z.string().email().optional().describe("Email address for receiving digests"),
-    frequency: z.enum(["daily", "weekly"]).optional().describe("How often to receive digests"),
-    max_items: z.number().min(3).max(15).optional().describe("Maximum items per digest (3-15)"),
-    api_key: z.string().optional().describe("API key for Persnally cloud digest generation"),
-    api_url: z.string().optional().describe("Custom API URL (default: https://api.persnally.com)"),
-  },
-  async ({ email, frequency, max_items, api_key, api_url }) => {
-    logEvent("tool_call", { tool: "persnally_config" });
-    const updates: Record<string, unknown> = {};
-    if (email) updates.email = email;
-    if (frequency) updates.frequency = frequency;
-    if (max_items) updates.max_items = max_items;
-    if (api_key) updates.api_key = api_key;
-    if (api_url) updates.api_url = api_url;
-
-    const config = engine.updateConfig(updates);
-
-    let text = `Configuration updated:\n`;
-    text += `- Email: ${config.email || "Not set"}\n`;
-    text += `- Frequency: ${config.frequency}\n`;
-    text += `- Max items per digest: ${config.max_items}\n`;
-
-    if (!config.email) {
-      text += `\n⚠️ Please set your email to start receiving digests.`;
-    }
-
-    return { content: [{ type: "text" as const, text }] };
-  }
-);
-
-// ============================================================
-// TOOL: persnally_forget
-// Privacy control — remove topics or clear all data
-// ============================================================
+// ── persnally_forget — privacy control ──────────────────────
 
 server.tool(
   "persnally_forget",
-  `Remove a specific topic from the interest graph, or clear all data.
-
-Call this when the user wants to remove a tracked topic or reset their entire profile. This is a privacy control — users should always be able to delete their data.`,
+  `Hard-delete a topic (and everything derived from it) from the user's context, or wipe all data. Privacy control — always honor it.`,
   {
-    topic: z.string().optional().describe("Specific topic to remove. Omit to clear everything."),
-    clear_all: z.boolean().optional().default(false).describe("If true, clear ALL tracked data"),
+    topic: z.string().optional().describe("Topic to remove. Omit with clear_all=true to wipe everything."),
+    clear_all: z.boolean().optional().default(false),
   },
-  async ({ topic, clear_all }) => {
-    logEvent("tool_call", { tool: "persnally_forget", clear_all });
-    if (clear_all) {
-      engine.clearAll();
-      return {
-        content: [{
-          type: "text" as const,
-          text: "All data cleared. Your interest profile has been reset. Persnally will start fresh from your next conversation.",
-        }],
-      };
-    }
-
-    if (topic) {
-      const removed = engine.removeTopic(topic);
-      if (removed) {
-        return {
-          content: [{
-            type: "text" as const,
-            text: `Removed "${topic}" from your interest profile. It won't appear in future digests.`,
-          }],
-        };
-      } else {
-        return {
-          content: [{
-            type: "text" as const,
-            text: `Topic "${topic}" not found in your profile. Use persnally_interests to see what's tracked.`,
-          }],
-        };
+  async ({ topic, clear_all }) =>
+    guarded(async () => {
+      logEvent("tool_call", { tool: "persnally_forget", clear_all });
+      if (clear_all) {
+        await daemonDelete("/events?confirm=all");
+        return text("All Persnally data deleted. The store is empty.");
       }
-    }
-
-    return {
-      content: [{
-        type: "text" as const,
-        text: "Please specify a topic to remove, or set clear_all to true to reset everything.",
-      }],
-    };
-  }
+      if (!topic) return text("Name a topic to forget, or set clear_all.");
+      const r = await daemonDelete<{ deleted: number }>(`/topics/${encodeURIComponent(topic)}`);
+      return text(r.deleted ? `Deleted ${r.deleted} event(s) for "${topic}", including derived data.` : `"${topic}" not found.`);
+    }),
 );
 
-// ============================================================
-// RESOURCES: Interest graph as a readable resource
-// ============================================================
-
-server.resource(
-  "interest-graph",
-  "persnally://interest-graph",
-  async (uri) => ({
-    contents: [{
-      uri: uri.href,
-      mimeType: "application/json",
-      text: JSON.stringify(engine.getGraphSummary(), null, 2),
-    }],
-  })
-);
-
-// ============================================================
-// START SERVER
-// ============================================================
+// ── start ───────────────────────────────────────────────────
 
 async function main() {
   const transport = new StdioServerTransport();
   server.server.oninitialized = () => {
     setClient(server.server.getClientVersion()?.name);
     logEvent("session_start");
+    migrateV1Graph()
+      .then((n) => { if (n > 0) logEvent("v1_migration", { nodes: n }); })
+      .catch(() => { /* daemon down — migration retries on next session */ });
   };
   await server.connect(transport);
-  console.error("Persnally MCP server running");
+  console.error("Persnally MCP server v2 running (daemon-backed)");
 }
 
 main().catch(console.error);

@@ -1,231 +1,125 @@
 #!/usr/bin/env node
-/**
- * End-to-end test for Persnally MCP server.
- * Simulates what Claude would do: track topics across multiple "conversations",
- * then check the interest graph and generate a digest payload.
- */
+// Protocol e2e: spawns the MCP server against a mock daemon and verifies every
+// tool round-trips correctly. HOME is sandboxed so telemetry/migration stay isolated.
 
-import { InterestEngine } from "./build/interest-engine.js";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import http from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-const engine = new InterestEngine();
+const MOCK_PORT = 49832;
+const received = { posts: [], deletes: [] };
 
-console.log("=== PERSNALLY E2E TEST ===\n");
+const mockDaemon = http.createServer((req, res) => {
+  let body = "";
+  req.on("data", (c) => (body += c));
+  req.on("end", () => {
+    const respond = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(obj)); };
+    if (req.method === "POST" && req.url === "/events") {
+      received.posts.push(JSON.parse(body));
+      return respond(201, { inserted: JSON.parse(body).length ?? 1, ids: ["x"] });
+    }
+    if (req.method === "DELETE") {
+      received.deletes.push(req.url);
+      return respond(200, { deleted: 1 });
+    }
+    if (req.url === "/profile") return respond(200, { headline: "A builder", sections: [{ title: "Work", body: "Ships fast." }], generated_at: "2026-06-11" });
+    if (req.url?.startsWith("/topics")) return respond(200, [{ topic: "rust", category: "technology", weight: 0.9, signals: 3, dominant_intent: "building", sentiment_balance: 0.5, entities: [] }]);
+    if (req.url === "/stats") return respond(200, { total: 4, first: "2026-01-01", last: "2026-06-11" });
+    respond(404, { error: "not found" });
+  });
+});
 
-// ── Simulate Conversation 1: User discussing Rust async programming ──
-console.log("📝 Conversation 1: Rust async programming");
-const r1 = engine.processSignals([
-  {
-    topic: "Rust async programming",
-    weight: 0.9,
-    intent: "building",
-    sentiment: "positive",
-    depth: "deep",
-    category: "technology",
-    entities: ["tokio", "async/await", "Rust"],
-    timestamp: new Date().toISOString(),
+// Fake HOME with a v1 graph so migration is exercised too.
+const home = mkdtempSync(join(tmpdir(), "persnally-e2e-"));
+mkdirSync(join(home, ".persnally"), { recursive: true });
+writeFileSync(join(home, ".persnally", "interest-graph.json"), JSON.stringify({
+  nodes: {
+    reactjs: {
+      topic: "ReactJS", category: "technology", current_weight: 0.7, avg_depth: 0.9,
+      dominant_intent: "building", sentiment_balance: 0.3, last_seen: "2026-06-01T00:00:00Z", entities: ["Next.js"],
+    },
   },
-  {
-    topic: "systems programming",
-    weight: 0.5,
-    intent: "discussing",
-    sentiment: "positive",
-    depth: "moderate",
-    category: "technology",
-    entities: ["memory safety", "zero-cost abstractions"],
-    timestamp: new Date().toISOString(),
-  },
-]);
-console.log(`   Tracked: ${r1.tracked} topics (${r1.topics.join(", ")})\n`);
+}));
 
-// ── Simulate Conversation 2: User exploring AI/ML ──
-console.log("📝 Conversation 2: AI/ML exploration");
-const r2 = engine.processSignals([
-  {
-    topic: "LLM fine-tuning",
-    weight: 0.8,
-    intent: "learning",
-    sentiment: "positive",
-    depth: "deep",
-    category: "technology",
-    entities: ["Claude", "LoRA", "Hugging Face"],
-    timestamp: new Date().toISOString(),
-  },
-  {
-    topic: "AI startup ideas",
-    weight: 0.6,
-    intent: "researching",
-    sentiment: "positive",
-    depth: "moderate",
-    category: "business",
-    entities: ["YC", "seed funding", "AI agents"],
-    timestamp: new Date().toISOString(),
-  },
-]);
-console.log(`   Tracked: ${r2.tracked} topics (${r2.topics.join(", ")})\n`);
+await new Promise((r) => mockDaemon.listen(MOCK_PORT, "127.0.0.1", r));
 
-// ── Simulate Conversation 3: User mentions CSS (negative sentiment) ──
-console.log("📝 Conversation 3: CSS frustration");
-const r3 = engine.processSignals([
-  {
-    topic: "CSS layout",
-    weight: 0.4,
-    intent: "debugging",
-    sentiment: "negative",
-    depth: "moderate",
-    category: "technology",
-    entities: ["flexbox", "grid"],
-    timestamp: new Date().toISOString(),
-  },
-]);
-console.log(`   Tracked: ${r3.tracked} topics (${r3.topics.join(", ")})\n`);
+const srv = spawn("node", ["build/index.js"], {
+  env: { ...process.env, HOME: home, PERSNALLYD_URL: `http://127.0.0.1:${MOCK_PORT}` },
+  stdio: ["pipe", "pipe", "inherit"],
+});
 
-// ── Simulate Conversation 4: Second mention of Rust (should boost it) ──
-console.log("📝 Conversation 4: More Rust (reinforcement)");
-const r4 = engine.processSignals([
-  {
-    topic: "Rust async programming",
-    weight: 0.7,
-    intent: "building",
-    sentiment: "positive",
-    depth: "moderate",
-    category: "technology",
-    entities: ["tokio", "axum", "tower"],
-    timestamp: new Date().toISOString(),
-  },
-]);
-console.log(`   Tracked: ${r4.tracked} topics (${r4.topics.join(", ")})\n`);
-
-// ── Check Interest Profile ──
-console.log("=== INTEREST PROFILE ===\n");
-const stats = engine.getStats();
-console.log(`Total: ${stats.total_topics} topics, ${stats.total_signals} signals, ${stats.total_conversations} conversations`);
-console.log(`Active: ${stats.active_topics} topics`);
-console.log(`Categories:`, stats.top_categories);
-
-const interests = engine.getTopInterests(10);
-console.log("\nTop Interests (sorted by weight):");
-for (const i of interests) {
-  const filled = Math.min(5, Math.round(i.current_weight * 5));
-  const bar = "█".repeat(filled) + "░".repeat(5 - filled);
-  console.log(`  ${i.topic.padEnd(25)} [${bar}] w=${i.current_weight.toFixed(3)} freq=${i.frequency} intent=${i.dominant_intent} sentiment=${i.sentiment_balance.toFixed(2)}`);
-}
-
-// ── Verify CSS is deprioritized ──
-const cssNode = interests.find(i => i.topic.toLowerCase().includes("css"));
-if (cssNode) {
-  const rustNode = interests.find(i => i.topic.toLowerCase().includes("rust"));
-  if (rustNode && rustNode.current_weight > cssNode.current_weight) {
-    console.log("\n✅ PASS: Rust (positive, deep, 2x) outweighs CSS (negative, moderate, 1x)");
-  } else {
-    console.log("\n❌ FAIL: CSS should be lower than Rust");
+let nextId = 0;
+const pending = new Map();
+srv.stdout.on("data", (d) => {
+  for (const line of d.toString().split("\n").filter(Boolean)) {
+    const msg = JSON.parse(line);
+    if (msg.id !== undefined && pending.has(msg.id)) {
+      pending.get(msg.id)(msg);
+      pending.delete(msg.id);
+    }
   }
-} else {
-  console.log("\n⚠️  CSS was pruned (below threshold) — that's acceptable");
+});
+function rpc(method, params) {
+  const id = ++nextId;
+  return new Promise((resolve, reject) => {
+    pending.set(id, resolve);
+    srv.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
+    setTimeout(() => reject(new Error(`timeout: ${method}`)), 8000);
+  });
 }
-
-// ── Check Balanced Allocation ──
-console.log("\n=== BALANCED ALLOCATION (7 items) ===\n");
-const balanced = engine.getBalancedInterests(7);
-for (const [cat, data] of Object.entries(balanced)) {
-  console.log(`${cat}: ${data.allocation} items`);
-  for (const interest of data.interests) {
-    console.log(`  - ${interest.topic} (w=${interest.current_weight.toFixed(3)})`);
-  }
-}
-
-// ── Generate Digest Payload ──
-console.log("\n=== DIGEST PAYLOAD ===\n");
-const config = engine.getConfig();
-const summary = engine.getGraphSummary();
-
-const digestPayload = {
-  email: config.email || "test@example.com",
-  interest_graph: summary,
-  balanced_allocation: Object.fromEntries(
-    Object.entries(balanced).map(([cat, data]) => [
-      cat,
-      {
-        allocation: data.allocation,
-        topics: data.interests.map(i => ({
-          topic: i.topic,
-          weight: i.current_weight,
-          intent: i.dominant_intent,
-          entities: i.entities.slice(0, 5),
-        })),
-      },
-    ])
-  ),
-  preferences: { max_items: config.max_items, frequency: config.frequency },
+const callTool = async (name, args) => {
+  const r = await rpc("tools/call", { name, arguments: args });
+  return r.result.content[0].text;
 };
 
-console.log(`Topics in graph: ${summary.topics.length}`);
-console.log(`Categories: ${Object.keys(summary.categories).join(", ")}`);
-console.log(`Total signals: ${summary.total_signals}`);
-console.log(`\nPayload size: ${JSON.stringify(digestPayload).length} bytes`);
+// ── handshake ──
+const init = await rpc("initialize", {
+  protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "e2e-test", version: "0" },
+});
+assert.equal(init.result.serverInfo.name, "persnally");
+srv.stdin.write(JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }) + "\n");
 
-// Validate the payload structure
-const requiredKeys = ["email", "interest_graph", "balanced_allocation", "preferences"];
-const missing = requiredKeys.filter(k => !(k in digestPayload));
-if (missing.length === 0) {
-  console.log("✅ PASS: Digest payload has all required keys");
-} else {
-  console.log(`❌ FAIL: Missing keys: ${missing.join(", ")}`);
-}
+// ── tools list ──
+const tools = (await rpc("tools/list", {})).result.tools.map((t) => t.name).sort();
+assert.deepEqual(tools, ["persnally_context", "persnally_forget", "persnally_interests", "persnally_track"]);
+console.log("✅ handshake + tool list");
 
-if (summary.topics.length >= 4) {
-  console.log("✅ PASS: Interest graph has enough topics for a digest");
-} else {
-  console.log(`❌ FAIL: Only ${summary.topics.length} topics — need at least 3-4`);
-}
+// ── track → daemon POST with provenance ──
+const trackText = await callTool("persnally_track", {
+  topics: [{ topic: "event sourcing", weight: 0.9, intent: "building", sentiment: "positive", depth: "deep", category: "technology", entities: ["SQLite"] }],
+});
+assert.match(trackText, /Recorded 1 signal/);
+const tracked = received.posts.find((p) => Array.isArray(p) && p[0]?.payload?.topic === "event sourcing");
+assert.ok(tracked, "track must POST to the daemon");
+assert.equal(tracked[0].source, "mcp:e2e-test");
+assert.deepEqual(tracked[0].provenance, { kind: "mcp", client: "e2e-test" });
+console.log("✅ track → POST /events with client provenance");
 
-// ── Test Topic Normalization ──
-console.log("\n=== TOPIC NORMALIZATION TEST ===\n");
-engine.processSignals([
-  {
-    topic: "React.js",
-    weight: 0.5,
-    intent: "learning",
-    sentiment: "positive",
-    depth: "mention",
-    category: "technology",
-    entities: ["React"],
-    timestamp: new Date().toISOString(),
-  },
-]);
-engine.processSignals([
-  {
-    topic: "React JS",
-    weight: 0.3,
-    intent: "discussing",
-    sentiment: "neutral",
-    depth: "mention",
-    category: "technology",
-    entities: ["React"],
-    timestamp: new Date().toISOString(),
-  },
-]);
+// ── migration fired on initialize ──
+const migrated = received.posts.find((p) => Array.isArray(p) && p[0]?.provenance?.file === "interest-graph.json");
+assert.ok(migrated, "v1 graph must be migrated");
+assert.equal(migrated[0].payload.topic, "ReactJS");
+assert.equal(migrated[0].payload.depth, "deep");
+assert.ok(existsSync(join(home, ".persnally", "interest-graph.json.v1-migrated")), "v1 file renamed");
+console.log("✅ v1 graph migrated and renamed");
 
-const allInterests = engine.getTopInterests(20);
-const reactNodes = allInterests.filter(i => i.topic.toLowerCase().includes("react"));
-if (reactNodes.length === 1) {
-  console.log(`✅ PASS: "React.js" and "React JS" merged into single node (freq=${reactNodes[0].frequency})`);
-} else if (reactNodes.length > 1) {
-  console.log(`❌ FAIL: Found ${reactNodes.length} separate React nodes — normalization issue`);
-  reactNodes.forEach(n => console.log(`   - "${n.topic}" (freq=${n.frequency})`));
-} else {
-  console.log("⚠️  No React nodes found (possibly below threshold)");
-}
+// ── context read ──
+const ctx = await callTool("persnally_context", { detail: "brief" });
+assert.match(ctx, /A builder/);
+assert.match(ctx, /rust.*0\.90/);
+console.log("✅ context renders profile + topics");
 
-// ── Test Forget ──
-console.log("\n=== PRIVACY TEST (forget) ===\n");
-const beforeCount = engine.getTopInterests(20).length;
-const removed = engine.removeTopic("CSS layout");
-console.log(`Remove "CSS layout": ${removed ? "✅ removed" : "⚠️ not found"}`);
-const afterCount = engine.getTopInterests(20).length;
-console.log(`Topics before: ${beforeCount}, after: ${afterCount}`);
+// ── interests + forget ──
+assert.match(await callTool("persnally_interests", {}), /rust — 0\.90/);
+await callTool("persnally_forget", { topic: "rust" });
+assert.ok(received.deletes.some((u) => u === "/topics/rust"), "forget must DELETE /topics/:t");
+console.log("✅ interests + forget");
 
-// ── Clean up test data ──
-engine.clearAll();
-console.log("\n✅ Cleared all test data");
-
-console.log("\n=== TEST COMPLETE ===");
+srv.kill();
+mockDaemon.close();
+rmSync(home, { recursive: true, force: true });
+console.log("\n=== ALL E2E CHECKS PASSED ===");
+process.exit(0);

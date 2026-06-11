@@ -5,7 +5,7 @@
 
 import http from "node:http";
 import { readFileSync } from "node:fs";
-import { validateEvent, type PersnallyEvent } from "./events.js";
+import { newEvent, validateEvent, type EventType, type PersnallyEvent, type Provenance } from "./events.js";
 import { synthesizeProfile } from "./profile.js";
 import type { EventStore } from "./store.js";
 
@@ -51,10 +51,29 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
       }
       if (req.method === "POST" && url.pathname === "/events") {
         const body = await readBody(req);
-        const events = (Array.isArray(body) ? body : [body]).map(validateEvent) as PersnallyEvent[];
+        // The daemon owns event identity: items without an id get one assigned here.
+        const events: PersnallyEvent[] = (Array.isArray(body) ? body : [body]).map((raw) => {
+          const r = raw as Record<string, unknown>;
+          return r.id
+            ? validateEvent(r)
+            : newEvent(
+                r.type as EventType,
+                String(r.source ?? ""),
+                r.payload as Record<string, unknown>,
+                r.provenance as Provenance,
+                typeof r.ts === "string" ? r.ts : undefined,
+              );
+        });
         store.append(events);
         store.rebuild();
-        return json(res, 201, { inserted: events.length });
+        return json(res, 201, { inserted: events.length, ids: events.map((e) => e.id) });
+      }
+      if (req.method === "DELETE" && url.pathname === "/events") {
+        if (url.searchParams.get("confirm") !== "all") {
+          return json(res, 400, { error: "destructive: requires ?confirm=all" });
+        }
+        store.forgetAll();
+        return json(res, 200, { deleted: "all" });
       }
       if (req.method === "DELETE" && url.pathname.startsWith("/topics/")) {
         const topic = decodeURIComponent(url.pathname.slice("/topics/".length));
