@@ -2,6 +2,7 @@
   "name": "persnallyd",
   "version": "0.1.0",
   "private": true,
+  "license": "FSL-1.1-MIT",
   "description": "Persnally daemon — the context engine for you: local-first, across every AI",
   "type": "module",
   "bin": {
