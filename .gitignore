@@ -131,3 +131,5 @@ web/.next/
 web/.env.local
 .npmrc
 .ruff_cache/
+persnallyd/README.md
+persnallyd/LICENSE

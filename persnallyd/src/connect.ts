@@ -30,8 +30,9 @@ function configPathFor(client: Client): { file: string; installed: boolean } {
 
 export function mcpServerPath(): string {
   if (process.env.PERSNALLY_MCP && existsSync(process.env.PERSNALLY_MCP)) return process.env.PERSNALLY_MCP;
-  const repoRelative = join(import.meta.dirname, "..", "..", "..", "mcp_server", "persnally", "build", "index.js");
-  if (existsSync(repoRelative)) return repoRelative;
+  // Bundled in this package: build/src/connect.js → build/src/mcp/index.js
+  const bundled = join(import.meta.dirname, "mcp", "index.js");
+  if (existsSync(bundled)) return bundled;
   throw new Error("Persnally MCP server build not found — set PERSNALLY_MCP to its index.js");
 }
 

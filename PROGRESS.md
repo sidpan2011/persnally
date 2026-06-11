@@ -28,7 +28,7 @@
 | Descriptive profile synthesis | ✅ Done (2026-06-11) | `persnallyd profile` → Fable 5 via structured outputs → `view_profile`, each section evidence-linked to event ids. Served at `GET /profile`. Real run produced a startling profile from structured events alone |
 | ChatGPT + git importers | ✅ Done (2026-06-11) | Shared extraction pipeline (`extract.ts`). ChatGPT: mapping-tree parser, fixture-tested (no real export on hand — verify on first real one). Git: fully deterministic/offline, repos→topics + manifests→skills, batch-undoable; real-run verified (persnally repo, 58 commits → top of graph at 0.73) |
 | Local dashboard | ✅ Done (2026-06-11) | Single static page served by the daemon at `localhost:4983` — profile with per-section "why does it think this?" provenance walk, decayed topic bars, per-topic hard-delete, re-synthesize button. No framework, no second app. 28 tests (daemon HTTP layer now covered) |
-| Signal-density floor | ⬜ | Fallback when import corpus is thin (Phase 0 finding) |
+| Signal-density floor | ✅ Done (2026-06-12) | Git importer covers developers; `setup` auto-imports ~/Projects; and when the store is still thin (<15 signals), setup asks 2 questions and seeds the graph — via the engine when present, deterministic phrase-split when key-free. The mirror is never empty |
 
 ## Phase 2 scoreboard (started early — entrance via MCP v2)
 
@@ -37,7 +37,7 @@
 | MCP server as daemon client | ✅ Done (2026-06-11) | v2 rewrite: 4 tools (`track`/`context`/`interests`/`forget`), daemon is single source of truth, v1 graph auto-migration, protocol e2e vs mock daemon + live round-trip verified. Dual-source-of-truth debt eliminated |
 | `persnally_context` read loop | ✅ Live | Any MCP client now gets the real profile + decayed topics |
 | Per-client permission scoping | ⬜ | All clients currently see everything |
-| `persnally connect <client>` one-command setup | ⬜ | Friction here is fatal per PIVOT.md |
+| `persnally connect <client>` one-command setup | ✅ Done (2026-06-12) | `persnallyd connect [client\|--all]` + full `persnallyd setup` onboarding (find exports → import → synthesize → connect → open dashboard) |
 | Nightly consolidation pass | ⬜ | From ARCHITECTURE.md — reflection + behavior assertions |
 
 ## Key findings log
@@ -67,13 +67,19 @@
 | 2026-06-11 | Business doctrine locked: hybrid cloud-as-amplifier (never plaintext custody), FSL licensing + open spec, Pro value ladder (zero-setup inference → agent relay → reflection → behavior model). PIVOT.md Phase 4 + CLAUDE.md principle 7 |
 | 2026-06-12 | Importers complete: ChatGPT (mapping-tree parser) + git (deterministic/offline, repos→topics, manifests→skills), shared extraction pipeline (PR #17) |
 | 2026-06-12 | Daemon lifecycle: start/stop/pidfile/launchd autostart (PR #18). Live on machine #1 — launchd-owned, KeepAlive verified. Dogfooding caught the RunAtLoad-vs-running-daemon retry loop; autostart now hands over. Known gap: launchd daemon has no ANTHROPIC_API_KEY → config file needed (launch prep) |
+| 2026-06-12 | Key wall killed (PR #19): local Ollama extraction (chooser: key → local → guidance; live-verified on real export via llama3.2, zero bytes left machine), `config set-key` (mode-600 file) for the launchd daemon |
+| 2026-06-12 | One-command onboarding (PR #19): `persnallyd setup` (auto-detect exports incl. zips, import, git, synthesize, connect clients, open dashboard, idempotent) + `connect [client\|--all]` |
+| 2026-06-12 | FSL-1.1-MIT license under **Persnally** (brand-as-licensor; legal entity swapped in at incorporation); README rewritten for v2; public ROADMAP.md (PR #19) |
+| 2026-06-12 | One npm package: `persnally@2.0.0` — MCP server folded into `persnallyd/src/mcp/`, bins `persnally`/`persnallyd`/`persnally-mcp`, `mcp_server/` deleted, CI folded. Dry-run clean. **Publish blocked by npm 24h unpublish cooldown until 2026-06-12 19:54 UTC (01:25 IST Jun 13)** — auth/2FA already verified |
+| 2026-06-12 | (Corrected) Actions never stalled — PR #19 merged at 19:41 UTC and later pushes went to the already-merged branch, which triggers no CI event. Lesson: check PR state before stacking commits |
 
 ## Next up
 
-1. **Show the describe-me output to 3–5 developer friends** (cold) — the real exit-criterion test.
-2. **~June 25:** run capture-rate analysis (fresh Claude export needed for the Desktop denominator) → Phase 0 verdict: is passive accrual a complement or does import carry v2 alone?
-3. **Decay/extraction port** into `store.rebuild()` — interest-engine weighting with the raw_weight double-count fix (first open item on the Phase 1 scoreboard).
-4. **Profile synthesis** — describe-me pipeline as a daemon extraction pass → `signal.assertion` events + profile view; then dashboard.
+1. **Publish `persnally@2.0.0`** after the npm cooldown lifts (2026-06-12 19:54 UTC / 01:25 IST Jun 13): `cd persnallyd && PATH="$HOME/.nvm/versions/node/v22.19.0/bin:$PATH" npm publish --otp=CODE`
+2. **Merge PR #20** (post-#19 stragglers: package unification, density floor).
+3. **Cold demos to 3–5 developers** — `npm i -g persnally && persnally setup` is now the whole script. The real Phase 0/1 exit gate.
+4. **~June 25:** capture-rate analysis (needs fresh Claude export) → passive-accrual verdict.
+5. **Build:** density-floor question fallback · per-client permission scoping · nightly consolidation pass.
 
 ## Known issues / carry-forward
 

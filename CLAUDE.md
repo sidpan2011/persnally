@@ -67,8 +67,7 @@ We're building the best-engineered product in this market. Every change is held 
 The old digest product (email/curation/content-sourcing, ~8.9k LOC) was **removed** in the v2 teardown (PR #11). What remains:
 
 **KEEP & EVOLVE**
-- `persnallyd/` — the v2 product: event store, decay extractor (`decay.ts`, ported from the v1 engine), importers, profile synthesis, daemon + dashboard. All new work lands here.
-- `mcp_server/persnally/` — thin MCP adapter over the daemon (v2): `persnally_track`/`persnally_context`/`persnally_interests`/`persnally_forget`. No local state; the daemon is the single source of truth.
+- `persnallyd/` — the v2 product AND the published npm package (`persnally`, bins: `persnally`/`persnallyd`/`persnally-mcp`): event store, decay extractor, importers, profile synthesis, daemon + dashboard, and the thin MCP adapter at `src/mcp/` (no local state; the daemon is the single source of truth). All new work lands here.
 - `src/skill_analyzer.py` + `src/repo_analyzer.py` — GitHub analysis = import-based cold start (Phase 1 importer, ~80% built).
 - `src/topic_utils.py`, `src/cache.py` — generic infra, no upward deps.
 - `api/routers/digest.py` — gutted to interest-graph `/sync` + `/interests` + `/stats` only; rename prefix to `/context` in Phase 1.

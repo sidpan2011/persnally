@@ -1,23 +1,31 @@
 {
-  "name": "persnallyd",
-  "version": "0.1.0",
-  "private": true,
+  "name": "persnally",
+  "version": "2.0.0",
   "license": "FSL-1.1-MIT",
-  "description": "Persnally daemon — the context engine for you: local-first, across every AI",
+  "description": "The context engine for you — local-first, across every AI. So every AI finally knows you.",
   "type": "module",
   "bin": {
-    "persnallyd": "build/src/cli.js"
+    "persnally": "build/src/cli.js",
+    "persnallyd": "build/src/cli.js",
+    "persnally-mcp": "build/src/mcp/index.js"
   },
+  "files": [
+    "build/src",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc && node -e \"require('fs').copyFileSync('src/dashboard.html','build/src/dashboard.html')\"",
-    "test": "npm run build && node --test \"build/test/*.test.js\"",
-    "serve": "npm run build && node build/src/cli.js serve"
+    "test": "npm run build && node --test build/test/*.test.js && node test-mcp-e2e.mjs",
+    "serve": "npm run build && node build/src/cli.js serve",
+    "prepublishOnly": "node -e \"const fs=require('fs');fs.copyFileSync('../README.md','README.md');fs.copyFileSync('../LICENSE','LICENSE')\" && npm test"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
+    "@modelcontextprotocol/sdk": "^1.5.0",
     "better-sqlite3": "^11.8.0",
     "zod": "^4.4.3"
   },
@@ -25,5 +33,24 @@
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.13.5",
     "typescript": "^5.7.3"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "context-engine",
+    "personal-context",
+    "local-first",
+    "ai",
+    "claude",
+    "interest-graph"
+  ],
+  "author": "Persnally",
+  "homepage": "https://persnally.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sidpan2011/persnally"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
