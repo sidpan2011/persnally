@@ -6,6 +6,7 @@
 
 import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
 import { parseClaudeExport, extractEvents } from "./importers/claude.js";
+import { renderProfile, synthesizeProfile } from "./profile.js";
 import { DEFAULT_DB_PATH, EventStore } from "./store.js";
 
 const USAGE = `persnallyd ${VERSION} — so every AI finally knows you
@@ -13,7 +14,8 @@ const USAGE = `persnallyd ${VERSION} — so every AI finally knows you
 Usage:
   persnallyd init                   Create the local store (~/.persnally/persnally.db)
   persnallyd import claude <dir>    Import a Claude data export (needs ANTHROPIC_API_KEY)
-  persnallyd show [topics|events]   Show derived topics (default) or recent events
+  persnallyd profile                Synthesize your profile from the store (needs ANTHROPIC_API_KEY)
+  persnallyd show [topics|events|profile]   Show topics (default), recent events, or the profile
   persnallyd forget <topic>         Hard-delete a topic and everything derived from it
   persnallyd forget --all           Delete all data
   persnallyd forget --batch <id>    Undo one import batch
@@ -48,9 +50,21 @@ async function main(): Promise<void> {
       console.log(`Undo with: persnallyd forget --batch ${batch}`);
       return;
     }
+    case "profile": {
+      if (!process.env.ANTHROPIC_API_KEY) return die("ANTHROPIC_API_KEY is required for synthesis");
+      const store = new EventStore();
+      console.error("Synthesizing profile from the event store...");
+      const profile = await synthesizeProfile(store);
+      store.close();
+      console.log(renderProfile(profile));
+      return;
+    }
     case "show": {
       const store = new EventStore();
-      if (args[0] === "events") {
+      if (args[0] === "profile") {
+        const p = store.getProfile();
+        console.log(p ? renderProfile(p) : "No profile yet. Run: persnallyd profile");
+      } else if (args[0] === "events") {
         for (const e of store.query({ limit: 20 })) {
           console.log(`${e.ts}  ${e.type.padEnd(18)} ${e.source.padEnd(16)} ${summarize(e.payload)}`);
         }

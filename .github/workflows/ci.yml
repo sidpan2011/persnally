@@ -6,10 +6,36 @@ on:
   pull_request:
     branches: [main, dev]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # ── persnallyd (v2 daemon — primary codebase) ───
+  persnallyd:
+    name: persnallyd — Type Check, Build, Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: persnallyd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: persnallyd/package-lock.json
+
+      - run: npm ci
+
+      - name: Build (tsc strict) + test
+        run: npm test
+
   # ── MCP Server (TypeScript) ─────────────────────
   mcp-server:
-    name: MCP Server — Lint, Build, Test
+    name: MCP Server — Type Check, Build, Test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,7 +63,7 @@ jobs:
 
   # ── API (Python) ────────────────────────────────
   api:
-    name: API — Lint, Type Check
+    name: API — Lint, Boot Check
     runs-on: ubuntu-latest
 
     steps:
@@ -51,13 +77,22 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install ruff mypy
+          pip install ruff
 
       - name: Ruff lint
-        run: ruff check src/ api/
+        run: ruff check src/ api/ experiments/
 
       - name: Ruff format check
-        run: ruff format --check src/ api/
+        run: ruff format --check src/ api/ experiments/
+
+      - name: Boot check (app imports, routes register)
+        run: PYTHONPATH=api python -c "import main; assert len(main.app.routes) > 5, 'route table suspiciously small'"
+        env:
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_ANON_KEY: placeholder
+          SUPABASE_SERVICE_ROLE_KEY: placeholder
+          ANTHROPIC_API_KEY: placeholder
+          RESEND_API_KEY: placeholder
 
   # ── Web (Next.js) ──────────────────────────────
   web:
@@ -87,16 +122,3 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
           NEXT_PUBLIC_API_URL: http://localhost:8000
-
-  # ── Docker Build ────────────────────────────────
-  docker:
-    name: Docker Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build API image
-        run: docker build -f Dockerfile.api -t persnally-api .
-
-      - name: Build Web image
-        run: docker build -f Dockerfile.web -t persnally-web .

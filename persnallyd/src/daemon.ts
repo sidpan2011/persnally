@@ -23,6 +23,10 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
       if (req.method === "GET" && url.pathname === "/topics") {
         return json(res, 200, store.topics(num(url, "limit", 50)));
       }
+      if (req.method === "GET" && url.pathname === "/profile") {
+        const profile = store.getProfile();
+        return profile ? json(res, 200, profile) : json(res, 404, { error: "no profile synthesized yet" });
+      }
       if (req.method === "GET" && url.pathname === "/events") {
         return json(res, 200, store.query({
           type: url.searchParams.get("type") ?? undefined,
