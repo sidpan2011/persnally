@@ -32,7 +32,8 @@ Distribution: CLI-installed · daemon-architected · MCP-consumed · dashboard-t
 3. **User interaction budget ≈ zero after day one.** Win by being in the default path, invisible.
 4. **Descriptive → predictive → prescriptive.** Earn each rung. No prediction before description is eerily good.
 5. **Cold start by import, not accrual.** The wow moment must land within 5 minutes of install.
-6. **Trust product:** local-first, open source, structured data only, inspectable, deletable. This is the credibility of neutrality — not optional.
+6. **Trust product:** local-first, source-available (auditable), structured data only, inspectable, deletable. This is the credibility of neutrality — not optional.
+7. **Cloud as amplifier, never as custodian.** Cloud services (sync, hosted compute, teams) may carry ciphertext and run opt-in stateless jobs — they never hold plaintext custody of user data. Crossing this line deletes our answer to "why not supermemory."
 
 ## Engineering standards (non-negotiable)
 
@@ -57,7 +58,7 @@ We're building the best-engineered product in this market. Every change is held 
 - **Phase 1 — The Mirror:** `persnallyd` + importers + descriptive profile + dashboard. Show HN launch.
 - **Phase 2 — The Layer:** MCP context server (`get_context`/`record_event`) + per-client permissions. North star: **context reads/user/week**.
 - **Phase 3 — The Loop:** one agent-facing decision loop (`ask_user_model`), ≥90% precision gate. Feedback closes itself via approvals/vetoes.
-- **Phase 4 — Business:** encrypted sync paid tier → teams later. Raise on Phase 2 retention or the Phase 3 demo.
+- **Phase 4 — Business:** hybrid cloud-as-amplifier. Free: full local engine (BYOK). Pro: zero-setup inference (we pay the model bill), agent relay (cloud agents + phones reach your context, E2E), reflection reports, encrypted backup, maintained connectors. Teams later. Licensing: FSL engine (auditable, fork-proof, →MIT after 2y) + open event-schema/MCP spec + closed cloud. Raise on Phase 2 retention or the Phase 3 demo.
 
 **Current phase: 0 (pre-build) — pivoting off the digest product.**
 

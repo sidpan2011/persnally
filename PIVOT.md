@@ -17,8 +17,9 @@
 | Brand | Persnally everywhere: `persnally` CLI, `persnallyd` daemon, npm, GitHub, domain — one spelling, all surfaces |
 | Form factor | Local **daemon** (the product) + MCP server (primary interface, consumed by AIs) + CLI (dev window) + local dashboard (trust surface) |
 | Beachhead | Developers — densest machine-readable event streams, earliest agent adopters, MCP-native distribution |
-| Trust posture | Local-first, open source, structured data only, inspectable, deletable. Non-negotiable — it's the credibility of neutrality |
-| Business model | Open-core engine → paid encrypted sync / multi-device / cloud inference → teams (org context) later |
+| Trust posture | Local-first, source-available (auditable), structured data only, inspectable, deletable. Non-negotiable — it's the credibility of neutrality |
+| Business model | Hybrid, cloud-as-amplifier (decided 2026-06-11): free local engine (FSL) → Pro cloud services (never plaintext custody) → teams. See Phase 4 |
+| Licensing | FSL on the engine (auditable + fork-proof, converts to MIT after 2y, Sentry's model) · event schema + MCP interface genuinely open spec · cloud services closed. Decide before launch; v1 npm (MIT) is already shipped and stays MIT |
 | Macro bet | A multi-model world. Every quarter the market stays plural, our data gravity grows |
 
 ### Operating principles
@@ -148,10 +149,22 @@ Open-source launch: Show HN + X thread. The hook: **"I imported my ChatGPT histo
 
 ## Phase 4 — The Business (parallel from late Phase 2)
 
-**Goal:** Convert position into a company.
+**Goal:** Convert position into a company. **Doctrine (2026-06-11): hybrid — cloud as amplifier, never as custodian.** The cloud may carry ciphertext and run opt-in stateless jobs; it never holds plaintext custody. Template: Tailscale (private data plane, paid coordination layer).
 
-- **Paid tier:** end-to-end-encrypted sync, multi-device, hosted inference for heavy extraction, mobile read access. The engine stays free and open — neutrality is the moat; monetize convenience, not access.
-- **Teams (later, deliberate):** org context layer — "how does this team decide/build/communicate" — fed by individual opt-in. Big-market slide; do not start before Phase 3 holds.
+**Free forever (the flywheel):** the full local engine — import, graph, profile, MCP serving, dashboard, deletion — BYOK for inference. Never crippled: every free user compounds data gravity (switching cost) and never has the wow paywalled.
+
+**Pro (~$8–15/mo) — value ladder, in conversion order:**
+1. **Zero-setup inference** — we carry the model bill; no API key. The funnel-killer remover; converts "works if technical" → "works." (Day-one viable)
+2. **Agent relay** — E2E, scoped per-client tokens: cloud agents, CI runners, and phones reach your context beyond loopback. Where the orthogonality thesis cashes out as revenue. (Phase 2)
+3. **Reflection service** — scheduled consolidation upgraded to self-knowledge reports: "what changed about you," behavior patterns over time. The WHOOP-for-your-mind product. (Phase 2–3)
+4. **The behavior model** — `ask_user_model`, drafting in your voice, with a visible fidelity score from the eval harness. The eventual flagship. (Phase 3)
+5. **Continuity insurance** — encrypted backup + point-in-time restore of the db that is, by month six, your accumulated self. Lowest-churn purchase in consumer software. (Day-one viable)
+6. **Maintained connectors** — continuous one-click importers that keep working when export formats break. Maintenance is a service.
+
+**Never paid:** local MCP serving, dashboard, deletion/privacy controls, the core graph. Charging for privacy is brand suicide; crippling the local loop kills the flywheel.
+
+- **Teams (later, deliberate):** org context layer — "how does this team decide/build/communicate" — fed by individual opt-in; org sees derived views, never raw events. Big-market slide; do not start before Phase 3 holds.
+- **Licensing:** FSL on the engine (read/audit/run free; can't be resold as a competing service; converts to MIT after 2 years — "everything we ship becomes fully open on a delay"). Event schema + MCP interface: genuinely open spec (the standard others build against). Cloud services: closed. Precedents: Sentry (FSL), Tailscale, 1Password and Obsidian (closed, local-first, trusted) — auditability is what trust requires, not OSI purity.
 - **Fundraise timing:** raise on Phase 2 traction (retention curve + north-star growth) or early Phase 3 (the agent-loop demo is the strongest artifact: *watch this agent stop asking me questions*). Deck arc: wedge (Mirror) → layer (default path) → loop (agents) → the context layer for all AI. "Twin" appears nowhere; the vision slide is the category: **the personal context engine**.
 
 ---

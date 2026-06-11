@@ -53,6 +53,8 @@
 | 2026-06-11 | Brand kit locked: pitch / tagline ("So every AI finally knows you") / descriptor ("The context engine for you") / competitive contrast — applied to CLI, packages, GitHub about |
 | 2026-06-11 | The Mirror loop complete: decay port + profile synthesis (`persnallyd profile`, `GET /profile`), 22 tests (PR #14, merged). Key learning: Fable 5 rejects forced tool_choice — moved all extraction to structured outputs (`messages.parse` + `zodOutputFormat`), deleting the hand-rolled schema converter |
 | 2026-06-11 | CI overhauled for v2: persnallyd job added (was zero CI), dead Docker job + Dockerfiles/compose deleted, API boot smoke check, concurrency cancellation. Full pipeline <1 min |
+| 2026-06-11 | docs/ARCHITECTURE.md: eight invariants, learning model, behavioral-model trajectory + eval harness |
+| 2026-06-11 | Business doctrine locked: hybrid cloud-as-amplifier (never plaintext custody), FSL licensing + open spec, Pro value ladder (zero-setup inference → agent relay → reflection → behavior model). PIVOT.md Phase 4 + CLAUDE.md principle 7 |
 
 ## Next up
 
