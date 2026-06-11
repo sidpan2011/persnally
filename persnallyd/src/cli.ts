@@ -4,6 +4,8 @@
  * Merges into the `persnally` npm identity at Phase 1 launch.
  */
 
+import { applyApiKey, configPath, loadConfig, saveConfig } from "./config.js";
+import { chooseExtractor } from "./llm.js";
 import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
 import { extractChatGPTEvents, parseChatGPTExport } from "./importers/chatgpt.js";
 import { extractClaudeEvents, parseClaudeExport } from "./importers/claude.js";
@@ -32,6 +34,8 @@ Usage:
   persnallyd stop                   Stop the background daemon
   persnallyd serve [--port N]       Run the daemon in the foreground (127.0.0.1:${DEFAULT_PORT})
   persnallyd autostart [--remove]   Start the daemon at login and keep it alive (macOS)
+  persnallyd config set-key <key>   Store the Anthropic API key (owner-only file) for the daemon
+  persnallyd config                 Show config (key masked)
 `;
 
 function parsePort(args: string[]): number {
@@ -41,7 +45,21 @@ function parsePort(args: string[]): number {
 
 async function main(): Promise<void> {
   const [cmd, ...args] = process.argv.slice(2);
+  applyApiKey();
   switch (cmd) {
+    case "config": {
+      if (args[0] === "set-key") {
+        if (!args[1]?.startsWith("sk-ant-")) return die("expected an Anthropic key (sk-ant-...)");
+        saveConfig({ anthropic_api_key: args[1] });
+        console.log(`Key saved to ${configPath()} (mode 600). Restart the daemon to apply: persnallyd stop`);
+        return;
+      }
+      const cfg = loadConfig();
+      const key = typeof cfg.anthropic_api_key === "string" ? cfg.anthropic_api_key : "";
+      console.log(`Config: ${configPath()}`);
+      console.log(`anthropic_api_key: ${key ? key.slice(0, 12) + "…" + key.slice(-4) : "(not set)"}`);
+      return;
+    }
     case "init": {
       const store = new EventStore();
       store.close();
@@ -60,10 +78,12 @@ async function main(): Promise<void> {
         console.error(`Found ${summaries.length} repo(s): ${summaries.map((s) => `${s.repo} (${s.commits} commits)`).join(", ")}`);
         ({ events, batch } = gitEvents(summaries));
       } else if (kind === "claude" || kind === "chatgpt") {
-        if (!process.env.ANTHROPIC_API_KEY) return die("ANTHROPIC_API_KEY is required for extraction");
+        const engine = await chooseExtractor("extract");
         const parsed = kind === "claude" ? parseClaudeExport(path) : parseChatGPTExport(path);
-        console.error(`Parsed ${parsed.conversations.length} conversations. Extracting...`);
-        ({ events, batch } = kind === "claude" ? await extractClaudeEvents(parsed) : await extractChatGPTEvents(parsed));
+        console.error(`Parsed ${parsed.conversations.length} conversations. Extracting with ${engine.label}...`);
+        ({ events, batch } = kind === "claude"
+          ? await extractClaudeEvents(parsed, engine.extract, engine.model)
+          : await extractChatGPTEvents(parsed, engine.extract, engine.model));
       } else {
         return die(`unknown import source "${kind}" — use claude, chatgpt, or git`);
       }
@@ -77,10 +97,10 @@ async function main(): Promise<void> {
       return;
     }
     case "profile": {
-      if (!process.env.ANTHROPIC_API_KEY) return die("ANTHROPIC_API_KEY is required for synthesis");
+      const engine = await chooseExtractor("profile");
       const store = new EventStore();
-      console.error("Synthesizing profile from the event store...");
-      const profile = await synthesizeProfile(store);
+      console.error(`Synthesizing profile with ${engine.label}...`);
+      const profile = await synthesizeProfile(store, engine.extract, engine.model);
       store.close();
       console.log(renderProfile(profile));
       return;
