@@ -71,12 +71,12 @@
 | 2026-06-12 | One-command onboarding (PR #19): `persnallyd setup` (auto-detect exports incl. zips, import, git, synthesize, connect clients, open dashboard, idempotent) + `connect [client\|--all]` |
 | 2026-06-12 | FSL-1.1-MIT license under **0byte lab**; README rewritten for v2; public ROADMAP.md (PR #19) |
 | 2026-06-12 | One npm package: `persnally@2.0.0` — MCP server folded into `persnallyd/src/mcp/`, bins `persnally`/`persnallyd`/`persnally-mcp`, `mcp_server/` deleted, CI folded. Dry-run clean. **Publish blocked by npm 24h unpublish cooldown until 2026-06-12 19:54 UTC (01:25 IST Jun 13)** — auth/2FA already verified |
-| 2026-06-12 | ⚠️ GitHub Actions stopped queuing runs repo-wide (~19:41 UTC) — likely private-repo minutes/billing; check github.com/settings/billing. Local suite is the gate meanwhile |
+| 2026-06-12 | (Corrected) Actions never stalled — PR #19 merged at 19:41 UTC and later pushes went to the already-merged branch, which triggers no CI event. Lesson: check PR state before stacking commits |
 
 ## Next up
 
 1. **Publish `persnally@2.0.0`** after the npm cooldown lifts (2026-06-12 19:54 UTC / 01:25 IST Jun 13): `cd persnallyd && PATH="$HOME/.nvm/versions/node/v22.19.0/bin:$PATH" npm publish --otp=CODE`
-2. **Merge PR #19**; restore GitHub Actions (billing check).
+2. **Merge PR #20** (post-#19 stragglers: package unification, density floor).
 3. **Cold demos to 3–5 developers** — `npm i -g persnally && persnally setup` is now the whole script. The real Phase 0/1 exit gate.
 4. **~June 25:** capture-rate analysis (needs fresh Claude export) → passive-accrual verdict.
 5. **Build:** density-floor question fallback · per-client permission scoping · nightly consolidation pass.
