@@ -5,14 +5,14 @@
 
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { topicWeight, type WeightSignal } from "./decay.js";
 import { normalizeTopic, validateEvent, type PersnallyEvent } from "./events.js";
+import { DATA_DIR } from "./paths.js";
 
 const VIEW_SCHEMA_VERSION = 2;
 
-export const DEFAULT_DB_PATH = join(homedir(), ".persnally", "persnally.db");
+export const DEFAULT_DB_PATH = join(DATA_DIR, "persnally.db");
 
 export interface QueryOpts {
   type?: string;

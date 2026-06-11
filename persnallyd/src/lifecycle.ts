@@ -1,0 +1,113 @@
+/**
+ * Daemon lifecycle — pidfile, detached start/stop, and macOS launchd autostart.
+ * The pidfile is advisory: a stale one (dead pid) is detected and cleaned up.
+ */
+
+import { execFileSync, spawn } from "node:child_process";
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { DATA_DIR } from "./paths.js";
+
+const PID_FILE = join(DATA_DIR, "daemon.pid");
+export const LOG_FILE = join(DATA_DIR, "daemon.log");
+const PLIST_LABEL = "com.persnally.daemon";
+const PLIST_PATH = join(homedir(), "Library", "LaunchAgents", `${PLIST_LABEL}.plist`);
+
+function alive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+/** Returns the running daemon's pid, cleaning up a stale pidfile if found. */
+export function runningPid(): number | null {
+  if (!existsSync(PID_FILE)) return null;
+  const pid = Number(readFileSync(PID_FILE, "utf-8").trim());
+  if (Number.isInteger(pid) && pid > 0 && alive(pid)) return pid;
+  unlinkSync(PID_FILE);
+  return null;
+}
+
+export function writePidFile(): void {
+  mkdirSync(DATA_DIR, { recursive: true });
+  writeFileSync(PID_FILE, String(process.pid));
+}
+
+export function removePidFile(): void {
+  try {
+    if (Number(readFileSync(PID_FILE, "utf-8").trim()) === process.pid) unlinkSync(PID_FILE);
+  } catch { /* already gone */ }
+}
+
+export async function startDetached(cliPath: string, port: number): Promise<number> {
+  mkdirSync(DATA_DIR, { recursive: true });
+  const log = openSync(LOG_FILE, "a");
+  const child = spawn(process.execPath, [cliPath, "serve", "--port", String(port)], {
+    detached: true,
+    stdio: ["ignore", log, log],
+    env: process.env,
+  });
+  child.unref();
+
+  for (let i = 0; i < 30; i++) {
+    await sleep(100);
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/health`);
+      if (r.ok) return child.pid!;
+    } catch { /* not up yet */ }
+  }
+  throw new Error(`daemon did not become healthy — check ${LOG_FILE}`);
+}
+
+export async function stopDaemon(): Promise<number | null> {
+  const pid = runningPid();
+  if (!pid) return null;
+  process.kill(pid, "SIGTERM");
+  for (let i = 0; i < 50; i++) {
+    await sleep(100);
+    if (!alive(pid)) return pid;
+  }
+  throw new Error(`daemon (pid ${pid}) did not exit within 5s`);
+}
+
+export function autostartInstalled(): boolean {
+  return existsSync(PLIST_PATH);
+}
+
+export function installAutostart(cliPath: string, port: number): string {
+  if (process.platform !== "darwin") throw new Error("autostart is macOS-only for now (launchd)");
+  const plist = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${PLIST_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${process.execPath}</string>
+    <string>${cliPath}</string>
+    <string>serve</string>
+    <string>--port</string>
+    <string>${port}</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>${LOG_FILE}</string>
+  <key>StandardErrorPath</key><string>${LOG_FILE}</string>
+</dict>
+</plist>
+`;
+  mkdirSync(join(homedir(), "Library", "LaunchAgents"), { recursive: true });
+  writeFileSync(PLIST_PATH, plist);
+  execFileSync("launchctl", ["load", "-w", PLIST_PATH]);
+  return PLIST_PATH;
+}
+
+export function removeAutostart(): boolean {
+  if (!existsSync(PLIST_PATH)) return false;
+  try { execFileSync("launchctl", ["unload", "-w", PLIST_PATH]); } catch { /* not loaded */ }
+  rmSync(PLIST_PATH);
+  return true;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
