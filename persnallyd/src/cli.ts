@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { applyApiKey, configPath, loadConfig, saveConfig } from "./config.js";
 import { CLIENTS, connectAll, connectClient, type Client } from "./connect.js";
 import { chooseExtractor } from "./llm.js";
-import { alreadyImported, detectExports, markImported } from "./setup.js";
+import { alreadyImported, DENSITY_QUESTIONS, detectExports, eventsFromAnswers, isThin, markImported } from "./setup.js";
 import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
 import { extractChatGPTEvents, parseChatGPTExport } from "./importers/chatgpt.js";
 import { extractClaudeEvents, parseClaudeExport } from "./importers/claude.js";
@@ -109,6 +109,24 @@ async function main(): Promise<void> {
         }
       }
       store.rebuild();
+
+      // 4b. Density floor — if everything is still thin, two questions beat an empty mirror
+      const signalCount = store.stats().byType["signal.topic"] ?? 0;
+      if (isThin(signalCount) && process.stdin.isTTY) {
+        console.log("\nYour history is light — two quick questions so Persnally starts with something real:");
+        const { createInterface } = await import("node:readline/promises");
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        const answers: string[] = [];
+        for (const q of DENSITY_QUESTIONS) answers.push(await rl.question(`  ${q}\n  > `));
+        rl.close();
+        const seeds = await eventsFromAnswers(answers, engine);
+        if (seeds.length) {
+          store.append(seeds);
+          store.rebuild();
+          imported += seeds.length;
+          console.log(`  ✓ Seeded ${seeds.length} signal(s) from your answers`);
+        }
+      }
 
       // 5. Profile
       if (engine && store.stats().total > 0) {

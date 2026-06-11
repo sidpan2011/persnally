@@ -30,35 +30,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Build (tsc strict) + test
-        run: npm test
-
-  # ── MCP Server (TypeScript) ─────────────────────
-  mcp-server:
-    name: MCP Server — Type Check, Build, Test
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mcp_server/persnally
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: mcp_server/persnally/package-lock.json
-
-      - run: npm ci
-
-      - name: TypeScript type check
-        run: npx tsc --noEmit
-
-      - name: Build
-        run: npm run build
-
-      - name: E2E test
+      - name: Build (tsc strict) + test (incl. MCP protocol e2e)
         run: npm test
 
   # ── API (Python) ────────────────────────────────
