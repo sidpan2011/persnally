@@ -4,13 +4,12 @@
  * Phase 0 finding: memories.json and projects are the highest-signal-per-byte sources.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { newEvent, uuidv7, PAYLOAD_SCHEMAS, type PersnallyEvent } from "../events.js";
+import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
 
-const DEFAULT_MODEL = process.env.PERSNALLY_MODEL ?? "claude-haiku-4-5-20251001";
 const MAX_CONVO_CHARS = 30_000;
 
 export interface ParsedConversation {
@@ -80,8 +79,11 @@ export interface ImportResult {
   conversationsProcessed: number;
 }
 
-export async function extractEvents(parsed: ParsedExport, model = DEFAULT_MODEL): Promise<ImportResult> {
-  const client = new Anthropic();
+export async function extractEvents(
+  parsed: ParsedExport,
+  extract: LlmExtract = anthropicExtract,
+  model = DEFAULT_EXTRACT_MODEL,
+): Promise<ImportResult> {
   const batch = uuidv7();
   const events: PersnallyEvent[] = [];
   const source = "import:claude";
@@ -89,12 +91,12 @@ export async function extractEvents(parsed: ParsedExport, model = DEFAULT_MODEL)
   for (const convo of parsed.conversations) {
     if (!convo.userMessages.length) continue;
     const text = convo.userMessages.join("\n").slice(0, MAX_CONVO_CHARS);
-    const result = await extractWithTool(
-      client, model, "emit_topics",
-      "Extract 1-5 topic signals from this conversation's user messages. Weight = centrality, depth = engagement level, sentiment = user's attitude toward the topic.",
-      { topics: topicsExtraction.shape.topics },
-      `Conversation title: ${convo.name}\n\nUser messages:\n${text}`,
-    );
+    const result = await extract({
+      model,
+      instruction: "Extract 1-5 topic signals from this conversation's user messages. Weight = centrality, depth = engagement level, sentiment = user's attitude toward the topic.",
+      schema: topicsExtraction,
+      content: `Conversation title: ${convo.name}\n\nUser messages:\n${text}`,
+    });
     const { topics } = topicsExtraction.parse(result);
     for (const t of topics) {
       events.push(newEvent("signal.topic", source, t,
@@ -109,12 +111,12 @@ export async function extractEvents(parsed: ParsedExport, model = DEFAULT_MODEL)
       parsed.memoryText.trim() && `Assistant's accumulated memory of the user:\n${parsed.memoryText}`,
       parsed.projects.length && `User-created projects:\n${parsed.projects.map((p) => `- ${p.name}: ${p.description}`).join("\n")}`,
     ].filter(Boolean).join("\n\n");
-    const result = await extractWithTool(
-      client, model, "emit_assertions",
-      "Extract structured assertions about this person: facts, preferences, behaviors, skills, and context. Confidence reflects how directly the source supports the claim.",
-      { assertions: assertionsExtraction.shape.assertions },
-      context,
-    );
+    const result = await extract({
+      model,
+      instruction: "Extract structured assertions about this person: facts, preferences, behaviors, skills, and context. Confidence reflects how directly the source supports the claim.",
+      schema: assertionsExtraction,
+      content: context,
+    });
     const { assertions } = assertionsExtraction.parse(result);
     for (const a of assertions) {
       events.push(newEvent("signal.assertion", source, a, { kind: "import", batch, file: "memories.json" }));
@@ -132,54 +134,3 @@ export async function extractEvents(parsed: ParsedExport, model = DEFAULT_MODEL)
   return { events, batch, conversationsProcessed: parsed.conversations.length };
 }
 
-async function extractWithTool(
-  client: Anthropic,
-  model: string,
-  toolName: string,
-  instruction: string,
-  shape: Record<string, z.ZodTypeAny>,
-  content: string,
-): Promise<unknown> {
-  const response = await client.messages.create({
-    model,
-    max_tokens: 4000,
-    tools: [{ name: toolName, description: instruction, input_schema: zodToJsonSchema(shape) }],
-    tool_choice: { type: "tool", name: toolName },
-    messages: [{ role: "user", content }],
-  });
-  const toolUse = response.content.find((b) => b.type === "tool_use");
-  if (!toolUse || toolUse.type !== "tool_use") throw new Error("Extraction returned no tool call");
-  return toolUse.input;
-}
-
-/** Minimal zod→JSON-schema for the flat shapes used here; replace if shapes grow nested. */
-function zodToJsonSchema(shape: Record<string, z.ZodTypeAny>): Anthropic.Tool.InputSchema {
-  const properties: Record<string, unknown> = {};
-  for (const [key, schema] of Object.entries(shape)) {
-    properties[key] = zodTypeToJson(schema);
-  }
-  return { type: "object" as const, properties, required: Object.keys(shape) };
-}
-
-function zodTypeToJson(schema: z.ZodTypeAny): unknown {
-  const def = schema._def;
-  switch (def.typeName) {
-    case "ZodArray": return { type: "array", items: zodTypeToJson(def.type) };
-    case "ZodObject": {
-      const properties: Record<string, unknown> = {};
-      const required: string[] = [];
-      for (const [k, v] of Object.entries(def.shape() as Record<string, z.ZodTypeAny>)) {
-        properties[k] = zodTypeToJson(v);
-        if (v._def.typeName !== "ZodOptional" && v._def.typeName !== "ZodDefault") required.push(k);
-      }
-      return { type: "object", properties, required };
-    }
-    case "ZodString": return { type: "string" };
-    case "ZodNumber": return { type: "number" };
-    case "ZodBoolean": return { type: "boolean" };
-    case "ZodEnum": return { type: "string", enum: def.values };
-    case "ZodDefault": return zodTypeToJson(def.innerType);
-    case "ZodOptional": return zodTypeToJson(def.innerType);
-    default: throw new Error(`Unsupported zod type for extraction schema: ${def.typeName}`);
-  }
-}

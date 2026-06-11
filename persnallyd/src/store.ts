@@ -7,7 +7,10 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { topicWeight, type WeightSignal } from "./decay.js";
 import { normalizeTopic, validateEvent, type PersnallyEvent } from "./events.js";
+
+const VIEW_SCHEMA_VERSION = 2;
 
 export const DEFAULT_DB_PATH = join(homedir(), ".persnally", "persnally.db");
 
@@ -24,10 +27,19 @@ export interface TopicRow {
   category: string;
   signals: number;
   weight: number;
+  sentiment_balance: number;
+  dominant_intent: string;
   entities: string[];
   first_seen: string;
   last_seen: string;
   event_ids: string[];
+}
+
+export interface StoredProfile {
+  headline: string;
+  sections: { title: string; body: string; evidence_event_ids: string[] }[];
+  generated_at: string;
+  model: string;
 }
 
 export class EventStore {
@@ -55,18 +67,40 @@ export class EventStore {
       CREATE INDEX IF NOT EXISTS idx_events_ts   ON events (ts);
       CREATE INDEX IF NOT EXISTS idx_events_type ON events (type, ts);
       CREATE INDEX IF NOT EXISTS idx_events_src  ON events (source, ts);
+    `);
+    // Views are derived state: on schema change, drop and re-derive rather than ALTER.
+    const ver = (this.db.pragma("user_version", { simple: true }) as number) ?? 0;
+    if (ver < VIEW_SCHEMA_VERSION) {
+      this.db.exec("DROP TABLE IF EXISTS view_topics; DROP TABLE IF EXISTS view_profile;");
+      this.db.pragma(`user_version = ${VIEW_SCHEMA_VERSION}`);
+    }
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS view_topics (
-        topic_key  TEXT PRIMARY KEY,
-        topic      TEXT NOT NULL,
-        category   TEXT NOT NULL,
-        signals    INTEGER NOT NULL,
-        weight     REAL NOT NULL,
-        entities   TEXT NOT NULL,
-        first_seen TEXT NOT NULL,
-        last_seen  TEXT NOT NULL,
-        event_ids  TEXT NOT NULL
+        topic_key         TEXT PRIMARY KEY,
+        topic             TEXT NOT NULL,
+        category          TEXT NOT NULL,
+        signals           INTEGER NOT NULL,
+        weight            REAL NOT NULL,
+        sentiment_balance REAL NOT NULL,
+        dominant_intent   TEXT NOT NULL,
+        entities          TEXT NOT NULL,
+        first_seen        TEXT NOT NULL,
+        last_seen         TEXT NOT NULL,
+        event_ids         TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS view_profile (
+        id           INTEGER PRIMARY KEY CHECK (id = 1),
+        headline     TEXT NOT NULL,
+        sections     TEXT NOT NULL,
+        generated_at TEXT NOT NULL,
+        model        TEXT NOT NULL
       );
     `);
+    // ver 0 is either a fresh db or a pre-versioning one — rebuild whenever events already exist.
+    if (ver < VIEW_SCHEMA_VERSION) {
+      const n = (this.db.prepare("SELECT COUNT(*) n FROM events").get() as { n: number }).n;
+      if (n > 0) this.rebuild();
+    }
   }
 
   append(events: PersnallyEvent[]): number {
@@ -118,50 +152,71 @@ export class EventStore {
     return rows.map((r) => ({ ...r, entities: JSON.parse(r.entities), event_ids: JSON.parse(r.event_ids) }));
   }
 
-  /**
-   * Re-derive view_topics from signal.topic events.
-   * TODO(phase1): port decay/sentiment weighting from interest-engine.ts —
-   * with the known fix for the raw_weight frequency double-count.
-   */
-  rebuild(): void {
+  /** Re-derive view_topics from signal.topic events using decayed per-signal weighting. */
+  rebuild(now: number = Date.now()): void {
     this.db.exec("DELETE FROM view_topics");
-    const topics = new Map<string, TopicRow>();
+
+    interface Acc { topic: string; categories: Map<string, number>; signals: WeightSignal[]; entities: Set<string>; first: string; last: string; ids: string[] }
+    const acc = new Map<string, Acc>();
     for (const e of this.query({ type: "signal.topic", limit: 1_000_000 })) {
-      const p = e.payload as { topic: string; weight: number; category: string; depth: string; entities: string[] };
+      const p = e.payload as { topic: string; weight: number; category: string; depth: string; sentiment: string; intent: string; entities: string[] };
       const key = normalizeTopic(p.topic);
       if (!key) continue;
-      const depthScore = { mention: 0.3, moderate: 0.6, deep: 1.0 }[p.depth] ?? 0.3;
-      const existing = topics.get(key);
-      if (existing) {
-        existing.signals += 1;
-        existing.weight += p.weight * depthScore;
-        existing.entities = [...new Set([...existing.entities, ...p.entities])].slice(0, 20);
-        existing.first_seen = e.ts < existing.first_seen ? e.ts : existing.first_seen;
-        existing.last_seen = e.ts > existing.last_seen ? e.ts : existing.last_seen;
-        existing.event_ids.push(e.id);
-      } else {
-        topics.set(key, {
-          topic_key: key,
-          topic: p.topic,
-          category: p.category,
-          signals: 1,
-          weight: p.weight * depthScore,
-          entities: p.entities.slice(0, 20),
-          first_seen: e.ts,
-          last_seen: e.ts,
-          event_ids: [e.id],
-        });
+      let a = acc.get(key);
+      if (!a) {
+        a = { topic: p.topic, categories: new Map(), signals: [], entities: new Set(), first: e.ts, last: e.ts, ids: [] };
+        acc.set(key, a);
       }
+      a.categories.set(p.category, (a.categories.get(p.category) ?? 0) + 1);
+      a.signals.push({ ts: e.ts, weight: p.weight, depth: p.depth, sentiment: p.sentiment, intent: p.intent });
+      for (const ent of p.entities) a.entities.add(ent);
+      if (e.ts < a.first) a.first = e.ts;
+      if (e.ts > a.last) a.last = e.ts;
+      a.ids.push(e.id);
     }
+
+    const rows: TopicRow[] = [...acc.entries()].map(([key, a]) => {
+      const w = topicWeight(a.signals, now);
+      return {
+        topic_key: key,
+        topic: a.topic,
+        category: [...a.categories.entries()].sort((x, y) => y[1] - x[1])[0]![0],
+        signals: a.signals.length,
+        weight: w.weight,
+        sentiment_balance: w.sentiment_balance,
+        dominant_intent: w.dominant_intent,
+        entities: [...a.entities].slice(0, 20),
+        first_seen: a.first,
+        last_seen: a.last,
+        event_ids: a.ids,
+      };
+    });
+
     const insert = this.db.prepare(
-      `INSERT INTO view_topics VALUES (@topic_key, @topic, @category, @signals, @weight, @entities, @first_seen, @last_seen, @event_ids)`,
+      `INSERT INTO view_topics VALUES (@topic_key, @topic, @category, @signals, @weight,
+        @sentiment_balance, @dominant_intent, @entities, @first_seen, @last_seen, @event_ids)`,
     );
-    const run = this.db.transaction((rows: TopicRow[]) => {
-      for (const r of rows) {
+    const run = this.db.transaction((batch: TopicRow[]) => {
+      for (const r of batch) {
         insert.run({ ...r, entities: JSON.stringify(r.entities), event_ids: JSON.stringify(r.event_ids) });
       }
     });
-    run([...topics.values()]);
+    run(rows);
+  }
+
+  saveProfile(p: StoredProfile): void {
+    this.db.prepare(
+      `INSERT INTO view_profile (id, headline, sections, generated_at, model)
+       VALUES (1, @headline, @sections, @generated_at, @model)
+       ON CONFLICT(id) DO UPDATE SET headline=@headline, sections=@sections, generated_at=@generated_at, model=@model`,
+    ).run({ ...p, sections: JSON.stringify(p.sections) });
+  }
+
+  getProfile(): StoredProfile | null {
+    const row = this.db.prepare("SELECT * FROM view_profile WHERE id = 1").get() as
+      | { headline: string; sections: string; generated_at: string; model: string }
+      | undefined;
+    return row ? { ...row, sections: JSON.parse(row.sections) } : null;
   }
 
   /** Hard-deletes matching topic events plus derived events referencing them, then rebuilds. */
