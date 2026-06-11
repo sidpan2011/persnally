@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "build": "tsc && node -e \"require('fs').copyFileSync('src/dashboard.html','build/src/dashboard.html')\"",
-    "test": "npm run build && node --test \"build/test/*.test.js\" && node test-mcp-e2e.mjs",
+    "test": "npm run build && node --test build/test/*.test.js && node test-mcp-e2e.mjs",
     "serve": "npm run build && node build/src/cli.js serve",
     "prepublishOnly": "node -e \"const fs=require('fs');fs.copyFileSync('../README.md','README.md');fs.copyFileSync('../LICENSE','LICENSE')\" && npm test"
   },
