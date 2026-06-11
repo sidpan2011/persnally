@@ -69,7 +69,7 @@
 | 2026-06-12 | Daemon lifecycle: start/stop/pidfile/launchd autostart (PR #18). Live on machine #1 — launchd-owned, KeepAlive verified. Dogfooding caught the RunAtLoad-vs-running-daemon retry loop; autostart now hands over. Known gap: launchd daemon has no ANTHROPIC_API_KEY → config file needed (launch prep) |
 | 2026-06-12 | Key wall killed (PR #19): local Ollama extraction (chooser: key → local → guidance; live-verified on real export via llama3.2, zero bytes left machine), `config set-key` (mode-600 file) for the launchd daemon |
 | 2026-06-12 | One-command onboarding (PR #19): `persnallyd setup` (auto-detect exports incl. zips, import, git, synthesize, connect clients, open dashboard, idempotent) + `connect [client\|--all]` |
-| 2026-06-12 | FSL-1.1-MIT license under **0byte lab**; README rewritten for v2; public ROADMAP.md (PR #19) |
+| 2026-06-12 | FSL-1.1-MIT license under **Persnally** (brand-as-licensor; legal entity swapped in at incorporation); README rewritten for v2; public ROADMAP.md (PR #19) |
 | 2026-06-12 | One npm package: `persnally@2.0.0` — MCP server folded into `persnallyd/src/mcp/`, bins `persnally`/`persnallyd`/`persnally-mcp`, `mcp_server/` deleted, CI folded. Dry-run clean. **Publish blocked by npm 24h unpublish cooldown until 2026-06-12 19:54 UTC (01:25 IST Jun 13)** — auth/2FA already verified |
 | 2026-06-12 | (Corrected) Actions never stalled — PR #19 merged at 19:41 UTC and later pushes went to the already-merged branch, which triggers no CI event. Lesson: check PR state before stacking commits |
 

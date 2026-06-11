@@ -19,7 +19,7 @@
 | Beachhead | Developers — densest machine-readable event streams, earliest agent adopters, MCP-native distribution |
 | Trust posture | Local-first, source-available (auditable), structured data only, inspectable, deletable. Non-negotiable — it's the credibility of neutrality |
 | Business model | Hybrid, cloud-as-amplifier (decided 2026-06-11): free local engine (FSL) → Pro cloud services (never plaintext custody) → teams. See Phase 4 |
-| Licensing | FSL on the engine (auditable + fork-proof, converts to MIT after 2y, Sentry's model) · event schema + MCP interface genuinely open spec · cloud services closed. Decided 2026-06-12: licensor **0byte lab**; v1 npm (MIT) already shipped and stays MIT |
+| Licensing | FSL on the engine (auditable + fork-proof, converts to MIT after 2y, Sentry's model) · event schema + MCP interface genuinely open spec · cloud services closed. Decided 2026-06-12: licensor **Persnally** (brand-as-licensor; swap in the legal entity — 0byte lab or successor — at incorporation); v1 npm (MIT) already shipped and stays MIT |
 | Macro bet | A multi-model world. Every quarter the market stays plural, our data gravity grows |
 
 ### Operating principles
