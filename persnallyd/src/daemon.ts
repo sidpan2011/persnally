@@ -7,6 +7,7 @@ import http from "node:http";
 import { readFileSync } from "node:fs";
 import { loadConfig } from "./config.js";
 import { runConsolidation, shouldRunNow } from "./consolidate.js";
+import { allowedCategories, loadScopes, type Category } from "./permissions.js";
 import { newEvent, validateEvent, type EventType, type PersnallyEvent, type Provenance } from "./events.js";
 import { chooseExtractor } from "./llm.js";
 import { synthesizeProfile } from "./profile.js";
@@ -30,11 +31,24 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
         return json(res, 200, store.stats());
       }
       if (req.method === "GET" && url.pathname === "/topics") {
-        return json(res, 200, store.topics(num(url, "limit", 50)));
+        const client = url.searchParams.get("client");
+        const allowed = client ? allowedCategories(client) : null;
+        let topics = store.topics(num(url, "limit", 50));
+        if (allowed) topics = topics.filter((t) => allowed.includes(t.category as Category));
+        return json(res, 200, topics);
       }
       if (req.method === "GET" && url.pathname === "/profile") {
+        // The synthesized profile is holistic prose — a scoped client gets only its
+        // allowed topics (above), never the cross-category narrative.
+        const client = url.searchParams.get("client");
+        if (client && allowedCategories(client) !== null) {
+          return json(res, 403, { error: "scoped: this client does not have profile access", scoped: true });
+        }
         const profile = store.getProfile();
         return profile ? json(res, 200, profile) : json(res, 404, { error: "no profile synthesized yet" });
+      }
+      if (req.method === "GET" && url.pathname === "/scopes") {
+        return json(res, 200, loadScopes());
       }
       if (req.method === "POST" && url.pathname === "/synthesize") {
         const engine = await chooseExtractor("profile");

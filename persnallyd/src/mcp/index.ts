@@ -101,9 +101,10 @@ Call this at the START of a conversation (or when personalization would improve 
   async ({ detail }) =>
     guarded(async () => {
       logEvent("tool_call", { tool: "persnally_context", detail });
+      const client = encodeURIComponent(getClient());
       const [profile, topics] = await Promise.all([
-        daemonGet<Profile>("/profile"),
-        daemonGet<TopicRow[]>(`/topics?limit=${detail === "full" ? 25 : 10}`),
+        daemonGet<Profile>(`/profile?client=${client}`),
+        daemonGet<TopicRow[]>(`/topics?limit=${detail === "full" ? 25 : 10}&client=${client}`),
       ]);
       if (!profile && !topics?.length) {
         return text("No context yet — the user hasn't imported data or tracked any signals.");
