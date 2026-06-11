@@ -29,7 +29,11 @@ export async function daemonGet<T>(path: string): Promise<T | null> {
 }
 
 export async function daemonPost<T>(path: string, body: unknown): Promise<T> {
-  const r = await request(path, { method: "POST", body: JSON.stringify(body) });
+  const r = await request(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
   if (!r.ok) throw new Error(`daemon ${path}: ${r.status} ${await r.text()}`);
   return r.json() as Promise<T>;
 }
