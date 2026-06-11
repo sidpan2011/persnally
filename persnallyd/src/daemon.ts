@@ -17,7 +17,17 @@ export const DEFAULT_PORT = 4983;
 export const VERSION = "0.1.0";
 
 export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server {
+  const localHosts = [`127.0.0.1:${port}`, `localhost:${port}`];
   const server = http.createServer(async (req, res) => {
+    // Loopback binding alone doesn't stop browsers: webpages can fire
+    // no-preflight POSTs at 127.0.0.1 (CSRF) or reach it via DNS rebinding.
+    if (!localHosts.includes(req.headers.host ?? "")) {
+      return json(res, 403, { error: "forbidden: unrecognized Host" });
+    }
+    const origin = req.headers.origin;
+    if (origin && !localHosts.some((h) => origin === `http://${h}`)) {
+      return json(res, 403, { error: "forbidden: cross-origin requests are not allowed" });
+    }
     const url = new URL(req.url ?? "/", `http://127.0.0.1:${port}`);
     try {
       if (req.method === "GET" && url.pathname === "/") {
@@ -69,6 +79,11 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
         }));
       }
       if (req.method === "POST" && url.pathname === "/events") {
+        // JSON-only forces browsers to preflight (which fails above) — no-preflight
+        // content types like text/plain can't reach the write path.
+        if (!(req.headers["content-type"] ?? "").includes("application/json")) {
+          return json(res, 415, { error: "Content-Type must be application/json" });
+        }
         const body = await readBody(req);
         // The daemon owns event identity: items without an id get one assigned here.
         const events: PersnallyEvent[] = (Array.isArray(body) ? body : [body]).map((raw) => {
@@ -84,7 +99,9 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
               );
         });
         store.append(events);
-        store.rebuild();
+        // Views derive only from signal.* events — skip the O(all-events) rebuild
+        // for telemetry writes like context.read.
+        if (events.some((e) => e.type.startsWith("signal."))) store.rebuild();
         return json(res, 201, { inserted: events.length, ids: events.map((e) => e.id) });
       }
       if (req.method === "DELETE" && url.pathname === "/events") {

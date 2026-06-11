@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
+import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
@@ -9,6 +10,12 @@ import { EventStore } from "../src/store.js";
 
 const PORT = 49831;
 const BASE = `http://127.0.0.1:${PORT}`;
+const postJson = (path: string, body: unknown, headers: Record<string, string> = {}) =>
+  fetch(BASE + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(body),
+  });
 const dir = mkdtempSync(join(tmpdir(), "daemon-test-"));
 const store = new EventStore(join(dir, "test.db"));
 let server: ReturnType<typeof startDaemon>;
@@ -44,7 +51,7 @@ test("GET /events?ids= resolves provenance lookups", async () => {
 });
 
 test("POST /events validates and rejects garbage", async () => {
-  const r = await fetch(BASE + "/events", { method: "POST", body: JSON.stringify({ type: "signal.bogus" }) });
+  const r = await postJson("/events", { type: "signal.bogus" });
   assert.equal(r.status, 400);
 });
 
@@ -54,35 +61,60 @@ test("GET /profile is 404 before synthesis, 200 after save", async () => {
   assert.equal((await fetch(BASE + "/profile")).status, 200);
 });
 
-test("POST /events without id gets one assigned by the daemon", async () => {
-  const r = await fetch(BASE + "/events", {
-    method: "POST",
-    body: JSON.stringify({
-      type: "signal.topic",
-      source: "mcp:claude-code",
-      payload: {
-        topic: "sqlite", weight: 0.5, intent: "building", sentiment: "neutral",
-        depth: "moderate", category: "technology", entities: [],
-      },
-      provenance: { kind: "mcp", client: "claude-code" },
-    }),
+test("POST /events without id gets one assigned, and signal batches rebuild views", async () => {
+  const r = await postJson("/events", {
+    type: "signal.topic",
+    source: "mcp:claude-code",
+    payload: {
+      topic: "sqlite", weight: 0.5, intent: "building", sentiment: "neutral",
+      depth: "moderate", category: "technology", entities: [],
+    },
+    provenance: { kind: "mcp", client: "claude-code" },
   });
   assert.equal(r.status, 201);
   const body = await r.json() as { inserted: number; ids: string[] };
   assert.equal(body.inserted, 1);
   assert.match(body.ids[0] ?? "", /^[0-9a-f-]{36}$/);
+  const topics = await (await fetch(BASE + "/topics")).json() as Array<{ topic_key: string }>;
+  assert.ok(topics.some((t) => t.topic_key === "sqlite"), "rebuild must run for signal events");
+});
+
+test("requests with a foreign Origin are rejected", async () => {
+  const r = await postJson("/events", { type: "signal.topic" }, { Origin: "https://evil.example" });
+  assert.equal(r.status, 403);
+  const ok = await postJson("/events", { type: "signal.bogus" }, { Origin: BASE });
+  assert.equal(ok.status, 400); // same-origin passes the guard, fails validation as usual
+});
+
+test("requests with a foreign Host are rejected (DNS rebinding)", async () => {
+  // fetch() forbids overriding Host — use a raw request.
+  const status = await new Promise<number>((resolve, reject) => {
+    const req = http.request(
+      { host: "127.0.0.1", port: PORT, path: "/stats", headers: { Host: "evil.example" } },
+      (res) => resolve(res.statusCode ?? 0),
+    );
+    req.on("error", reject);
+    req.end();
+  });
+  assert.equal(status, 403);
+});
+
+test("POST /events without JSON content type is rejected (CSRF preflight bypass)", async () => {
+  const r = await fetch(BASE + "/events", {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ type: "signal.topic" }),
+  });
+  assert.equal(r.status, 415);
 });
 
 test("POST /events accepts context.read and keeps it out of /topics", async () => {
   const before = await (await fetch(BASE + "/topics")).json() as Array<{ topic_key: string }>;
-  const r = await fetch(BASE + "/events", {
-    method: "POST",
-    body: JSON.stringify({
-      type: "context.read",
-      source: "mcp:cursor",
-      payload: { scope: "brief", client_purpose: "personalize review", items: 4 },
-      provenance: { kind: "mcp", client: "cursor" },
-    }),
+  const r = await postJson("/events", {
+    type: "context.read",
+    source: "mcp:cursor",
+    payload: { scope: "brief", client_purpose: "personalize review", items: 4 },
+    provenance: { kind: "mcp", client: "cursor" },
   });
   assert.equal(r.status, 201);
   const after = await (await fetch(BASE + "/topics")).json() as Array<{ topic_key: string }>;
