@@ -48,6 +48,7 @@ re-derives all views from the log.
 |---|---|
 | `mcp:<client>` | Live MCP session (`mcp:claude-code`, `mcp:claude-desktop`, `mcp:cursor`, ...) — client name from the MCP handshake |
 | `import:claude` | Claude data export importer |
+| `import:claude-code` | Claude Code local transcripts importer (`~/.claude/projects`) |
 | `import:chatgpt` | ChatGPT data export importer |
 | `import:git` | Git history importer |
 | `cli` | User action via `persnally` CLI |

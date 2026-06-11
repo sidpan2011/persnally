@@ -17,6 +17,9 @@ import { alreadyImported, DENSITY_QUESTIONS, detectExports, eventsFromAnswers, i
 import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
 import { extractChatGPTEvents, parseChatGPTExport } from "./importers/chatgpt.js";
 import { extractClaudeEvents, parseClaudeExport } from "./importers/claude.js";
+import {
+  DEFAULT_TRANSCRIPTS_DIR, extractClaudeCodeEvents, parseClaudeCodeTranscripts,
+} from "./importers/claude-code.js";
 import { gitEvents, scanRepos } from "./importers/git.js";
 import {
   autostartInstalled, installAutostart, LOG_FILE, removeAutostart,
@@ -34,6 +37,7 @@ Usage:
   persnallyd scope                  Show all client scopes
   persnallyd init                   Create the local store (~/.persnally/persnally.db)
   persnallyd import claude <dir>    Import a Claude data export (needs ANTHROPIC_API_KEY)
+  persnallyd import claude-code [dir]  Import Claude Code session transcripts (default ~/.claude/projects)
   persnallyd import chatgpt <path>  Import a ChatGPT export dir or conversations.json (needs ANTHROPIC_API_KEY)
   persnallyd import git <path> [--author <email>]   Import repo activity (offline, no LLM); path = repo or folder of repos
   persnallyd profile                Synthesize your profile from the store
@@ -99,6 +103,23 @@ async function main(): Promise<void> {
           console.log(`  ✓ ${result.events.length} events`);
         }
         if (found.cleanup) rmSync(found.cleanup, { recursive: true, force: true });
+      }
+
+      // 3b. Claude Code transcripts — local, no export wait. Capped at the 50 most
+      // recent sessions so setup stays fast; full history via `import claude-code`.
+      if (engine && existsSync(DEFAULT_TRANSCRIPTS_DIR) && !alreadyImported(DEFAULT_TRANSCRIPTS_DIR)) {
+        const { parsed, sessionsFound, sessionsDropped } = parseClaudeCodeTranscripts(DEFAULT_TRANSCRIPTS_DIR, 50);
+        if (parsed.conversations.length) {
+          console.log(
+            `→ Importing Claude Code transcripts: ${parsed.conversations.length} session(s)` +
+            (sessionsDropped ? ` (most recent of ${sessionsFound} — full history: persnallyd import claude-code)` : ""),
+          );
+          const result = await extractClaudeCodeEvents(parsed, engine.extract, engine.model);
+          store.append(result.events);
+          markImported(DEFAULT_TRANSCRIPTS_DIR);
+          imported += result.events.length;
+          console.log(`  ✓ ${result.events.length} events`);
+        }
       }
 
       // 4. Git activity from ~/Projects
@@ -204,10 +225,23 @@ async function main(): Promise<void> {
     }
     case "import": {
       const [kind, path] = args;
-      if (!kind || !path) return die("usage: persnallyd import claude|chatgpt|git <path>");
+      const usage = "usage: persnallyd import claude|claude-code|chatgpt|git <path>";
+      if (!kind) return die(usage);
 
       let events, batch;
-      if (kind === "git") {
+      if (kind === "claude-code") {
+        const engine = await chooseExtractor("extract");
+        const root = path ?? DEFAULT_TRANSCRIPTS_DIR;
+        const { parsed, sessionsFound, sessionsDropped } = parseClaudeCodeTranscripts(root);
+        if (!parsed.conversations.length) return die(`No usable sessions found at ${root}`);
+        console.error(
+          `Found ${sessionsFound} session(s)${sessionsDropped ? ` — importing the ${parsed.conversations.length} most recent` : ""}. ` +
+          `Extracting with ${engine.label}...`,
+        );
+        ({ events, batch } = await extractClaudeCodeEvents(parsed, engine.extract, engine.model, root));
+      } else if (!path) {
+        return die(usage);
+      } else if (kind === "git") {
         const authorIdx = args.indexOf("--author");
         const summaries = scanRepos(path, authorIdx > -1 ? args[authorIdx + 1] : undefined);
         if (!summaries.length) return die(`No git repos with your commits found at ${path}`);
@@ -221,7 +255,7 @@ async function main(): Promise<void> {
           ? await extractClaudeEvents(parsed, engine.extract, engine.model)
           : await extractChatGPTEvents(parsed, engine.extract, engine.model));
       } else {
-        return die(`unknown import source "${kind}" — use claude, chatgpt, or git`);
+        return die(`unknown import source "${kind}" — use claude, claude-code, chatgpt, or git`);
       }
 
       const store = new EventStore();

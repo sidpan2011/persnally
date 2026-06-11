@@ -86,7 +86,7 @@ export const provenanceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("local"), surface: z.enum(["cli", "dashboard"]) }),
 ]);
 
-const sourcePattern = /^(mcp:[a-z0-9._-]+|import:(claude|chatgpt|git)|cli|dashboard|system)$/;
+const sourcePattern = /^(mcp:[a-z0-9._-]+|import:(claude-code|claude|chatgpt|git)|cli|dashboard|system)$/;
 
 export const eventSchema = z.object({
   id: z.string().uuid(),
