@@ -29,6 +29,7 @@
 | ChatGPT + git importers | ✅ Done (2026-06-11) | Shared extraction pipeline (`extract.ts`). ChatGPT: mapping-tree parser, fixture-tested (no real export on hand — verify on first real one). Git: fully deterministic/offline, repos→topics + manifests→skills, batch-undoable; real-run verified (persnally repo, 58 commits → top of graph at 0.73) |
 | Local dashboard | ✅ Done (2026-06-11) | Single static page served by the daemon at `localhost:4983` — profile with per-section "why does it think this?" provenance walk, decayed topic bars, per-topic hard-delete, re-synthesize button. No framework, no second app. 28 tests (daemon HTTP layer now covered) |
 | Signal-density floor | ✅ Done (2026-06-12) | Git importer covers developers; `setup` auto-imports ~/Projects; and when the store is still thin (<15 signals), setup asks 2 questions and seeds the graph — via the engine when present, deterministic phrase-split when key-free. The mirror is never empty |
+| Claude Code transcripts importer | ✅ Done (2026-06-12) | `~/.claude/projects` JSONL sessions — the richer dev corpus from the Phase 0 finding, local, no export wait. Human prompts only (drops tool results, sidechains, command palettes, injected reminders), `ai-title` session names, most-recent cap with honest drop reporting. `import claude-code` + setup auto-import (50-session cap). Real-run: 95 sessions / 2,133 prompts parsed in 1.3s |
 
 ## Phase 2 scoreboard (started early — entrance via MCP v2)
 
@@ -74,6 +75,8 @@
 | 2026-06-12 | One npm package: `persnally@2.0.0` — MCP server folded into `persnallyd/src/mcp/`, bins `persnally`/`persnallyd`/`persnally-mcp`, `mcp_server/` deleted, CI folded. Dry-run clean. **Publish blocked by npm 24h unpublish cooldown until 2026-06-12 19:54 UTC (01:25 IST Jun 13)** — auth/2FA already verified |
 | 2026-06-12 | (Corrected) Actions never stalled — PR #19 merged at 19:41 UTC and later pushes went to the already-merged branch, which triggers no CI event. Lesson: check PR state before stacking commits |
 | 2026-06-12 | `context.read` emission wired into `persnally_context` (was schema-only — north-star metric was unmeasurable). New optional `purpose` param captures why the AI read context. 60 tests + e2e green |
+| 2026-06-12 | Daemon hardened against browser-origin requests (PR #24): Host allowlist + Origin check + JSON-only write path. Closed a real pre-launch hole — any webpage could fire no-preflight POSTs at 127.0.0.1:4983 and inject events. Also: rebuild skipped for non-signal batches |
+| 2026-06-12 | Claude Code transcripts importer (`import claude-code` + setup auto-import). The corpus Phase 0 flagged as richer than claude.ai exports for devs, now in the default path |
 
 ## Next up
 
