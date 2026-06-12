@@ -80,15 +80,14 @@
 
 ## Next up
 
-1. **Publish `persnally@2.0.0`** after the npm cooldown lifts (2026-06-12 19:54 UTC / 01:25 IST Jun 13): `cd persnallyd && PATH="$HOME/.nvm/versions/node/v22.19.0/bin:$PATH" npm publish --otp=CODE`
-2. **Merge PR #20** (post-#19 stragglers: package unification, density floor).
-3. **Cold demos to 3–5 developers** — `npm i -g persnally && persnally setup` is now the whole script. The real Phase 0/1 exit gate.
-4. **~June 25:** capture-rate analysis (needs fresh Claude export) → passive-accrual verdict.
-5. **Build:** density-floor question fallback · per-client permission scoping · nightly consolidation pass.
+1. **Publish `persnally@2.0.0`** after the npm cooldown lifts (2026-06-12 19:54 UTC / 01:25 IST Jun 13): `cd persnallyd && PATH="$HOME/.nvm/versions/node/v22.19.0/bin:$PATH" npm publish --otp=CODE`. Artifact verified 2026-06-12: 68 tests + e2e green on dev tip, tarball clean (50 files, 43.3 kB), CLI boots.
+2. **Cold demos to 3–5 developers** — `npm i -g persnally && persnally setup` is now the whole script. The real Phase 0/1 exit gate. **No new build work before this.**
+3. **~June 25:** capture-rate analysis (needs fresh Claude export) → passive-accrual verdict: `python experiments/capture_rate.py --since 2026-06-11 --export <fresh-export>`.
+4. **Build backlog (gated on demo + retention evidence):** scoped per-category profile synthesis (scoped clients currently lose `/profile` entirely) · `search_context` fuzzy lookup · `user.correction` capture flow (today correction = deletion) · Linux systemd autostart (launchd is macOS-only; HN skews Linux) · parallel import extraction (serial today — large exports are slow) · encryption at rest (required before Phase 4 sync).
 
 ## Known issues / carry-forward
 
-- Interest decay double-counts frequency in `interest-engine.ts` (`raw_weight` unbounded + frequency bonus) — fix when porting to event-log extractor.
-- `dominant_intent` takes latest signal, not most-frequent.
-- No real test harness yet (one manual `.mjs` e2e); v2 code gets tests from day one per CLAUDE.md standards.
-- npm `persnally` v1.0.0 still live with old digest description — republish at Phase 1 launch.
+- v1 carry-forwards resolved in the v2 port: decay double-count and `dominant_intent` both fixed in `decay.ts` (verified by tests); test harness now real (68 unit tests + protocol e2e, CI-gated).
+- npm `persnally` v1.0.0 unpublished 2026-06-11 — name reserved through cooldown; v2.0.0 republish is Next up #1.
+- MCP client identity is self-reported (`clientVersion.name`) — per-client scoping is enforceable only against honest clients until per-client tokens (planned with the Phase 4 agent relay).
+- Transcript format for the Claude Code importer is Anthropic-internal/undocumented — parse tests catch regressions in our parser, not format drift on disk.
