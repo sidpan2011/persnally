@@ -14,7 +14,10 @@ import { synthesizeProfile } from "./profile.js";
 import type { EventStore } from "./store.js";
 
 export const DEFAULT_PORT = 4983;
-export const VERSION = "0.1.0";
+
+// Single source of truth for the user-visible version: package.json.
+const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf-8")) as { version: string };
+export const VERSION: string = pkg.version;
 
 export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server {
   const localHosts = [`127.0.0.1:${port}`, `localhost:${port}`];
