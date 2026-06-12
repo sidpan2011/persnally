@@ -9,6 +9,7 @@
  * context, so signal extraction costs zero extra inference.
  */
 
+import { readFileSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -16,7 +17,9 @@ import { DAEMON_HINT, DaemonUnreachable, daemonDelete, daemonGet, daemonPost } f
 import { migrateV1Graph } from "./migrate-v1.js";
 import { getClient, logEvent, setClient } from "./telemetry.js";
 
-const server = new McpServer({ name: "persnally", version: "2.0.0" });
+// Handshake version tracks package.json — same rule as the daemon's VERSION.
+const pkg = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf-8")) as { version: string };
+const server = new McpServer({ name: "persnally", version: pkg.version });
 
 interface TopicRow {
   topic: string;

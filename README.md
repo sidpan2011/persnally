@@ -1,7 +1,5 @@
 # Persnally
 
-[![CI](https://github.com/sidpan2011/persnally/actions/workflows/ci.yml/badge.svg)](https://github.com/sidpan2011/persnally/actions/workflows/ci.yml)
-
 **So every AI finally knows you.**
 
 Persnally is a local-first personal context engine. It learns who you are from your AI activity — your Claude and ChatGPT history, your code — and serves that context to every AI tool you use, so they stop treating you like a stranger.
@@ -20,14 +18,23 @@ The fix isn't a better model. It's a layer underneath all of them that holds *yo
 
 ```bash
 npm install -g persnally
+persnally setup
+```
+
+One command builds your mirror: it finds Claude/ChatGPT exports in `~/Downloads`, reads your local Claude Code sessions and git repos, synthesizes an evidence-linked profile, connects your AI clients (Claude Desktop, Claude Code, Cursor), and opens the dashboard.
+
+For the richest result, export your data first ([claude.ai](https://claude.com) / [chatgpt.com](https://chatgpt.com) → Settings → Data export) and drop it in `~/Downloads` — then read a description of yourself that's sharper than your own bio, every sentence traceable to the conversations it came from.
+
+Prefer each step explicit?
+
+```bash
 persnallyd start                      # the local daemon
 persnallyd import claude ~/Downloads/<your-claude-export>
+persnallyd import claude-code         # your local Claude Code sessions
 persnallyd import git ~/Projects      # offline, no API needed
 persnallyd profile                    # synthesize who you are
 open http://127.0.0.1:4983            # see it, with evidence for every claim
 ```
-
-Export your data ([claude.ai](https://claude.com) / [chatgpt.com](https://chatgpt.com) → Settings → Data export), point Persnally at it, and read a description of yourself that's sharper than your own bio — every sentence traceable to the conversations it came from.
 
 ## How it works
 
@@ -50,7 +57,11 @@ Export your data ([claude.ai](https://claude.com) / [chatgpt.com](https://chatgp
 
 ## Make your AI tools use it
 
-Add the MCP server to any client (Claude Desktop, Cursor, Claude Code). It exposes four tools backed by the daemon:
+```bash
+persnallyd connect --all     # writes the MCP config for Claude Desktop, Claude Code, Cursor
+```
+
+Or add the MCP server to any client manually. It exposes four tools backed by the daemon:
 
 | Tool | What it does |
 |------|-------------|
@@ -74,10 +85,14 @@ Add the MCP server to any client (Claude Desktop, Cursor, Claude Code). It expos
 ## CLI
 
 ```
-persnallyd start | stop | status        # daemon lifecycle
+persnally setup                          # one command: import, synthesize, connect
+persnallyd start | stop | status         # daemon lifecycle
 persnallyd autostart [--remove]          # run at login (macOS)
-persnallyd import claude|chatgpt|git <path>
+persnallyd connect [client|--all]        # add to claude-code | claude-desktop | cursor
+persnallyd import claude|claude-code|chatgpt|git <path>
+persnallyd scope <client> <categories>   # limit what a client can read
 persnallyd profile                       # synthesize the profile
+persnallyd consolidate                   # reflect now: refresh decay, add behavior patterns
 persnallyd show [topics|events|profile]
 persnallyd forget <topic> | --all | --batch <id>
 persnallyd config set-key <sk-ant-…>     # key for the background daemon
@@ -85,7 +100,7 @@ persnallyd config set-key <sk-ant-…>     # key for the background daemon
 
 ## Status
 
-Early and moving fast — see [ROADMAP.md](./ROADMAP.md). Today: import from Claude/ChatGPT/git, a decay-weighted interest graph, an evidence-linked profile, a local dashboard, and the MCP layer that serves it all. Next: cross-tool context everywhere, then a behavior model that can answer *what would I do here?*
+Early and moving fast — see [ROADMAP.md](./ROADMAP.md). Today: import from Claude, ChatGPT, Claude Code, and git; a decay-weighted interest graph; an evidence-linked profile; a local dashboard; per-client permission scoping; nightly consolidation; and the MCP layer that serves it all. Next: cross-tool context everywhere, then a behavior model that can answer *what would I do here?*
 
 ## License
 
