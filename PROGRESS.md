@@ -77,6 +77,8 @@
 | 2026-06-12 | `context.read` emission wired into `persnally_context` (was schema-only — north-star metric was unmeasurable). New optional `purpose` param captures why the AI read context. 60 tests + e2e green |
 | 2026-06-12 | Daemon hardened against browser-origin requests (PR #24): Host allowlist + Origin check + JSON-only write path. Closed a real pre-launch hole — any webpage could fire no-preflight POSTs at 127.0.0.1:4983 and inject events. Also: rebuild skipped for non-signal batches |
 | 2026-06-12 | Claude Code transcripts importer (`import claude-code` + setup auto-import). The corpus Phase 0 flagged as richer than claude.ai exports for devs, now in the default path |
+| 2026-06-13 | **`persnally@2.0.0` published** (npm account: sidhanthp; stale `~/.npmrc` token caused masked-404 publish failures, post-unpublish tombstone caused a transient 409). Verified: clean install, all bins, daemon restarted onto hardened build (origin probe 403 / text-plain 415) |
+| 2026-06-13 | v2.0.1: npm page fixes — CI badge removed (404s while repo is private), quick start rewritten around `persnally setup`, CLI/tools sections updated, MCP handshake version now reads package.json |
 
 ## Next up
 
