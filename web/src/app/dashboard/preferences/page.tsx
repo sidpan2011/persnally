@@ -91,24 +91,25 @@ export default function PreferencesPage() {
     }
   };
 
-  if (loading) return <div className="text-center py-12 text-gray-400">Loading...</div>;
+  if (loading) return <div className="text-center py-12 text-mute">Loading...</div>;
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-black mb-6">Preferences</h1>
+    <div className="max-w-2xl bg-night text-ink">
+      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt">Preferences</p>
+      <h1 className="text-2xl text-ink font-semibold tracking-tight mt-1 mb-6">Preferences</h1>
 
       {/* Interests */}
       <section className="mb-8">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Interests</h3>
+        <h3 className="text-sm font-medium text-ink mb-3">Interests</h3>
         <div className="flex flex-wrap gap-2 mb-3">
           {INTEREST_OPTIONS.map((opt) => (
             <button
               key={opt}
               onClick={() => toggleInterest(opt)}
-              className={`px-3 py-1.5 rounded-full text-sm border transition-colors cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md border font-mono text-[12px] transition-colors cursor-pointer ${
                 interests.includes(opt.toLowerCase())
-                  ? "bg-black text-white border-black"
-                  : "border-gray-200 text-gray-600 hover:border-gray-400"
+                  ? "border-volt/40 bg-electric/15 text-volt"
+                  : "border-line bg-panel text-mute hover:border-volt/30"
               }`}
             >
               {opt}
@@ -117,7 +118,7 @@ export default function PreferencesPage() {
           {interests
             .filter((i) => !INTEREST_OPTIONS.map((o) => o.toLowerCase()).includes(i))
             .map((custom) => (
-              <span key={custom} className="px-3 py-1.5 rounded-full text-sm bg-black text-white border border-black">
+              <span key={custom} className="px-2.5 py-1 rounded-md font-mono text-[12px] border border-volt/40 bg-electric/15 text-volt">
                 {custom}
                 <button onClick={() => setInterests((p) => p.filter((x) => x !== custom))} className="ml-1 cursor-pointer">&times;</button>
               </span>
@@ -129,19 +130,19 @@ export default function PreferencesPage() {
             onChange={(e) => setCustomInterest(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addCustom()}
             placeholder="Add custom..."
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-black"
+            className="flex-1 bg-night border border-line rounded-lg px-3 py-1.5 text-sm text-ink placeholder:text-faint focus:border-volt focus:outline-none"
           />
-          <button onClick={addCustom} className="px-3 py-1.5 bg-gray-100 rounded-lg text-sm hover:bg-gray-200 cursor-pointer">Add</button>
+          <button onClick={addCustom} className="px-3 py-1.5 bg-panel border border-line rounded-lg text-sm text-mute hover:border-volt/30 hover:text-volt transition-colors cursor-pointer">Add</button>
         </div>
       </section>
 
       {/* Experience */}
       <section className="mb-8">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Experience Level</h3>
+        <h3 className="text-sm font-medium text-ink mb-3">Experience Level</h3>
         <select
           value={experienceLevel}
           onChange={(e) => setExperienceLevel(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black"
+          className="bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink focus:border-volt focus:outline-none"
         >
           <option value="beginner">Beginner</option>
           <option value="intermediate">Intermediate</option>
@@ -152,11 +153,11 @@ export default function PreferencesPage() {
 
       {/* Content Style */}
       <section className="mb-8">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Content Style</h3>
+        <h3 className="text-sm font-medium text-ink mb-3">Content Style</h3>
         <select
           value={contentStyle}
           onChange={(e) => setContentStyle(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black"
+          className="bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink focus:border-volt focus:outline-none"
         >
           <option value="technical">Deep Technical</option>
           <option value="technical_with_business_context">Technical + Business</option>
@@ -166,18 +167,18 @@ export default function PreferencesPage() {
 
       {/* Location */}
       <section className="mb-8">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Location</h3>
+        <h3 className="text-sm font-medium text-ink mb-3">Location</h3>
         <input
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="e.g. San Francisco, USA"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-black"
+          className="w-full bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-volt focus:outline-none"
         />
       </section>
 
       {/* Opportunity Types */}
       <section className="mb-8">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Opportunity Types</h3>
+        <h3 className="text-sm font-medium text-ink mb-3">Opportunity Types</h3>
         <div className="flex flex-wrap gap-2">
           {["hackathons", "jobs", "funding", "events", "conferences"].map((type) => (
             <button
@@ -187,10 +188,10 @@ export default function PreferencesPage() {
                   prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
                 )
               }
-              className={`px-3 py-1.5 rounded-full text-sm border transition-colors capitalize cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md border font-mono text-[12px] transition-colors capitalize cursor-pointer ${
                 opportunityTypes.includes(type)
-                  ? "bg-black text-white border-black"
-                  : "border-gray-200 text-gray-600 hover:border-gray-400"
+                  ? "border-volt/40 bg-electric/15 text-volt"
+                  : "border-line bg-panel text-mute hover:border-volt/30"
               }`}
             >
               {type}
@@ -203,7 +204,7 @@ export default function PreferencesPage() {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="bg-black text-white px-6 py-2.5 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:bg-gray-300 cursor-pointer"
+        className="rounded-lg bg-electric px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-volt disabled:opacity-50 cursor-pointer"
       >
         {saving ? "Saving..." : saved ? "Saved!" : "Save Preferences"}
       </button>
