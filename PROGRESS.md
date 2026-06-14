@@ -79,6 +79,7 @@
 | 2026-06-12 | Claude Code transcripts importer (`import claude-code` + setup auto-import). The corpus Phase 0 flagged as richer than claude.ai exports for devs, now in the default path |
 | 2026-06-13 | **`persnally@2.0.0` published** (npm account: sidhanthp; stale `~/.npmrc` token caused masked-404 publish failures, post-unpublish tombstone caused a transient 409). Verified: clean install, all bins, daemon restarted onto hardened build (origin probe 403 / text-plain 415) |
 | 2026-06-13 | v2.0.1: npm page fixes — CI badge removed (404s while repo is private), quick start rewritten around `persnally setup`, CLI/tools sections updated, MCP handshake version now reads package.json |
+| 2026-06-15 | Full pre-launch security audit of the published surface (every file, not a diff). No critical/high findings — XSS escaped, SQL parameterized, exec is shell-free, no secret egress, 0 dep CVEs. v2.0.2 hardening: API-key file created mode-0600 (closes TOCTOU window), plist values XML-escaped (malformed-plist on exotic usernames), `connectAll` resilient to one client's malformed config. Decision flagged for launch: `telemetry.jsonl` is local-only but the name reads as phone-home |
 
 ## Next up
 
