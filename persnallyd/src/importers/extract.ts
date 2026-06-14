@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { newEvent, uuidv7, PAYLOAD_SCHEMAS, type PersnallyEvent } from "../events.js";
+import { newEvent, safeIso, uuidv7, PAYLOAD_SCHEMAS, type PersnallyEvent } from "../events.js";
 import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
 
 const MAX_CONVO_CHARS = 30_000;
@@ -55,7 +55,7 @@ export async function extractEvents(
     for (const t of topics) {
       events.push(newEvent("signal.topic", opts.source, t,
         { kind: "import", batch, file: opts.file, conversation_uuid: convo.uuid },
-        new Date(convo.created_at).toISOString(),
+        safeIso(convo.created_at),
       ));
     }
   }
