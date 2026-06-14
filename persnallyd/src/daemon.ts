@@ -14,6 +14,8 @@ import { synthesizeProfile } from "./profile.js";
 import type { EventStore } from "./store.js";
 
 export const DEFAULT_PORT = 4983;
+const MAX_BODY_BYTES = 25 * 1024 * 1024; // generous for import batches; bounds memory
+const MAX_QUERY_LIMIT = 10_000;          // ceiling for public ?limit= params
 
 // Single source of truth for the user-visible version: package.json.
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf-8")) as { version: string };
@@ -151,19 +153,33 @@ function dashboardHtml(): string {
 }
 
 function json(res: http.ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { "Content-Type": "application/json" });
-  res.end(JSON.stringify(body));
+  // Never throw from the responder — the request socket may already be gone
+  // (e.g. an oversized body we destroyed), and a throw here would be unhandled.
+  if (res.headersSent || res.writableEnded) return;
+  try {
+    res.writeHead(status, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(body));
+  } catch { /* socket closed mid-response */ }
 }
 
 function num(url: URL, key: string, fallback: number): number {
   const v = Number(url.searchParams.get(key));
-  return Number.isFinite(v) && v > 0 ? v : fallback;
+  return Number.isFinite(v) && v > 0 ? Math.min(v, MAX_QUERY_LIMIT) : fallback;
 }
 
 function readBody(req: http.IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let data = "";
-    req.on("data", (chunk) => (data += chunk));
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        reject(new Error("request body too large"));
+        req.destroy();
+        return;
+      }
+      data += chunk;
+    });
     req.on("end", () => {
       try { resolve(JSON.parse(data)); } catch { reject(new Error("invalid JSON body")); }
     });

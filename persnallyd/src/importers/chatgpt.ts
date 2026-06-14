@@ -6,6 +6,7 @@
 
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { safeIso } from "../events.js";
 import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
 import { extractEvents, type ImportResult, type ParsedConversation, type ParsedExport } from "./extract.js";
 
@@ -41,7 +42,7 @@ export function parseChatGPTExport(path: string): ParsedExport {
       uuid: String(c.conversation_id ?? c.id ?? ""),
       name: String(c.title ?? ""),
       summary: "",
-      created_at: c.create_time ? new Date(c.create_time * 1000).toISOString() : new Date().toISOString(),
+      created_at: safeIso(c.create_time ? c.create_time * 1000 : undefined),
       userMessages,
     };
   });
