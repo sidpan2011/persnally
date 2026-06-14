@@ -75,6 +75,9 @@ export function autostartInstalled(): boolean {
 
 export function installAutostart(cliPath: string, port: number): string {
   if (process.platform !== "darwin") throw new Error("autostart is macOS-only for now (launchd)");
+  // Paths carry the username/home dir; escape so an "&" or "<" in a path can't
+  // produce a malformed plist that silently breaks autostart.
+  const x = xmlEscape;
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -82,16 +85,16 @@ export function installAutostart(cliPath: string, port: number): string {
   <key>Label</key><string>${PLIST_LABEL}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>${process.execPath}</string>
-    <string>${cliPath}</string>
+    <string>${x(process.execPath)}</string>
+    <string>${x(cliPath)}</string>
     <string>serve</string>
     <string>--port</string>
-    <string>${port}</string>
+    <string>${x(String(port))}</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>${LOG_FILE}</string>
-  <key>StandardErrorPath</key><string>${LOG_FILE}</string>
+  <key>StandardOutPath</key><string>${x(LOG_FILE)}</string>
+  <key>StandardErrorPath</key><string>${x(LOG_FILE)}</string>
 </dict>
 </plist>
 `;
@@ -110,4 +113,9 @@ export function removeAutostart(): boolean {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function xmlEscape(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[c]!));
 }

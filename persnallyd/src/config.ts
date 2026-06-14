@@ -25,7 +25,9 @@ export function saveConfig(updates: Record<string, unknown>): void {
   const file = configFile();
   mkdirSync(dirname(file), { recursive: true });
   const merged = { ...loadConfig(), ...updates };
-  writeFileSync(file, JSON.stringify(merged, null, 2) + "\n");
+  // mode on create closes the world-readable window before chmod; chmod also
+  // corrects perms on a pre-existing file. The config holds the API key.
+  writeFileSync(file, JSON.stringify(merged, null, 2) + "\n", { mode: 0o600 });
   chmodSync(file, 0o600);
 }
 
