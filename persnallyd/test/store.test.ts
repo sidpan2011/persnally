@@ -50,3 +50,12 @@ test("forgetBatch removes an entire import reversibly", () => {
   assert.ok(deleted > 0);
   assert.equal(store.stats().total, before - deleted);
 });
+
+test("forgetAll also clears the synthesized profile (deletable for real)", () => {
+  store.append([topic("rust")]);
+  store.saveProfile({ headline: "a builder", sections: [], generated_at: "2026-06-15T00:00:00Z", model: "test" });
+  assert.ok(store.getProfile(), "profile present before wipe");
+  store.forgetAll();
+  assert.equal(store.stats().total, 0);
+  assert.equal(store.getProfile(), null, "profile must be gone after forget --all");
+});

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { newEvent, normalizeTopic, uuidv7, validateEvent } from "../src/events.js";
+import { newEvent, normalizeTopic, safeIso, uuidv7, validateEvent } from "../src/events.js";
 
 const topicPayload = {
   topic: "rust async",
@@ -17,6 +17,15 @@ test("newEvent builds a valid signal.topic event", () => {
   assert.equal(e.type, "signal.topic");
   assert.equal(e.schema_ver, 1);
   assert.ok(e.id.match(/^[0-9a-f-]{36}$/));
+});
+
+test("safeIso passes valid dates through and falls back on junk (never throws)", () => {
+  assert.equal(safeIso("2026-01-02T03:04:05.000Z"), "2026-01-02T03:04:05.000Z");
+  assert.equal(safeIso(1700000000000), new Date(1700000000000).toISOString());
+  for (const junk of ["not-a-date", "", undefined, null, {}, NaN]) {
+    const out = safeIso(junk);
+    assert.ok(!Number.isNaN(Date.parse(out)), `safeIso(${JSON.stringify(junk)}) must yield a valid ISO date`);
+  }
 });
 
 test("unknown event type is rejected", () => {
