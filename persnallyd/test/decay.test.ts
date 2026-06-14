@@ -19,6 +19,12 @@ test("frequency is not double-counted: N old signals never outweigh N fresh ones
   assert.ok(old < fresh, `10 month-old signals (${old}) must decay below 2 fresh ones (${fresh})`);
 });
 
+test("an unparseable timestamp is skipped, never turning the weight into NaN", () => {
+  const w = topicWeight([sig("not-a-date"), sig(daysAgo(0))], NOW).weight;
+  assert.ok(Number.isFinite(w), "weight must stay finite");
+  assert.equal(w, topicWeight([sig(daysAgo(0))], NOW).weight, "bad signal contributes nothing");
+});
+
 test("negative sentiment deprioritizes but never zeroes", () => {
   const neutral = topicWeight([sig(daysAgo(0))], NOW).weight;
   const negative = topicWeight([sig(daysAgo(0), 1, "deep", "negative")], NOW).weight;

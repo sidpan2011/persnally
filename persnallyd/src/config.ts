@@ -4,7 +4,7 @@
  * are preserved (the file predates v2). Saved with owner-only permissions.
  */
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DATA_DIR } from "./paths.js";
 
@@ -25,9 +25,13 @@ export function saveConfig(updates: Record<string, unknown>): void {
   const file = configFile();
   mkdirSync(dirname(file), { recursive: true });
   const merged = { ...loadConfig(), ...updates };
-  // mode on create closes the world-readable window before chmod; chmod also
-  // corrects perms on a pre-existing file. The config holds the API key.
-  writeFileSync(file, JSON.stringify(merged, null, 2) + "\n", { mode: 0o600 });
+  // Atomic write: a crash mid-write must never leave a truncated config —
+  // that would silently drop the API key and all scopes (loadConfig swallows
+  // parse errors). Write to a temp file, then rename (atomic on one fs).
+  // mode 0600 on create + chmod keeps the key owner-only through the swap.
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(merged, null, 2) + "\n", { mode: 0o600 });
+  renameSync(tmp, file);
   chmodSync(file, 0o600);
 }
 

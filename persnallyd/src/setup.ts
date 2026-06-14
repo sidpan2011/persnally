@@ -20,11 +20,16 @@ export interface FoundExport {
 }
 
 function sniffKind(conversationsJson: string): ExportKind | null {
+  // 64 KB: the discriminating key can sit past a large first record (esp. ChatGPT).
   const fd = openSync(conversationsJson, "r");
-  const buf = Buffer.alloc(4096);
-  const n = readSync(fd, buf, 0, buf.length, 0);
-  closeSync(fd);
-  const head = buf.toString("utf-8", 0, n);
+  let head: string;
+  try {
+    const buf = Buffer.alloc(65536);
+    const n = readSync(fd, buf, 0, buf.length, 0);
+    head = buf.toString("utf-8", 0, n);
+  } finally {
+    closeSync(fd); // always close, even if readSync throws
+  }
   if (head.includes('"chat_messages"')) return "claude";
   if (head.includes('"mapping"')) return "chatgpt";
   return null;

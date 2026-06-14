@@ -7,6 +7,7 @@
 import { existsSync, readFileSync, renameSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { safeIso } from "../events.js";
 import { daemonPost } from "./daemon-client.js";
 
 const GRAPH_FILE = join(homedir(), ".persnally", "interest-graph.json");
@@ -35,6 +36,8 @@ export async function migrateV1Graph(): Promise<number> {
   try {
     nodes = JSON.parse(readFileSync(GRAPH_FILE, "utf-8")).nodes ?? {};
   } catch {
+    // Corrupt v1 file — move it aside so we don't reparse it on every session.
+    try { renameSync(GRAPH_FILE, GRAPH_FILE + ".v1-corrupt"); } catch { /* leave it */ }
     return 0;
   }
   const entries = Object.values(nodes);
@@ -44,7 +47,7 @@ export async function migrateV1Graph(): Promise<number> {
     const events = entries.map((n) => ({
       type: "signal.topic",
       source: "system",
-      ts: new Date(n.last_seen).toISOString(),
+      ts: safeIso(n.last_seen),
       payload: {
         topic: n.topic,
         weight: Math.min(Math.max(n.current_weight, 0.05), 1),

@@ -141,6 +141,14 @@ export function uuidv7(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+/** A valid ISO timestamp from an untrusted value (import dates), or now if it
+    can't be parsed — `new Date(junk).toISOString()` throws, which would crash
+    a whole import mid-batch after paying for earlier extractions. */
+export function safeIso(value: unknown): string {
+  const d = new Date(value as string | number);
+  return Number.isFinite(d.getTime()) ? d.toISOString() : new Date().toISOString();
+}
+
 /** Topic normalization, carried over from v1's interest engine (proven merge rules). */
 export function normalizeTopic(topic: string): string {
   let key = topic.toLowerCase().trim();
