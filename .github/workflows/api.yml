@@ -1,0 +1,48 @@
+name: API
+
+# The FastAPI service (parked out of the v2 critical path; revived in Phase 4).
+# Runs only when its own code changes.
+on:
+  push:
+    branches: [main, dev]
+    paths: ["api/**", "src/**", "requirements.txt", "ruff.toml", ".github/workflows/api.yml"]
+  pull_request:
+    branches: [main, dev]
+    paths: ["api/**", "src/**", "requirements.txt", "ruff.toml", ".github/workflows/api.yml"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API — Lint, Boot Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Ruff lint
+        run: ruff check src/ api/
+
+      - name: Ruff format check
+        run: ruff format --check src/ api/
+
+      - name: Boot check (app imports, routes register)
+        run: PYTHONPATH=api python -c "import main; assert len(main.app.routes) > 5, 'route table suspiciously small'"
+        env:
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_ANON_KEY: placeholder
+          SUPABASE_SERVICE_ROLE_KEY: placeholder
+          ANTHROPIC_API_KEY: placeholder
+          RESEND_API_KEY: placeholder

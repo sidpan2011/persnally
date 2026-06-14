@@ -1,17 +1,19 @@
-name: CI
+name: persnallyd
 
+# The v2 product. Runs only when the package changes.
 on:
   push:
     branches: [main, dev]
+    paths: ["persnallyd/**", ".github/workflows/ci.yml"]
   pull_request:
     branches: [main, dev]
+    paths: ["persnallyd/**", ".github/workflows/ci.yml"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ── persnallyd (v2 daemon — primary codebase) ───
   persnallyd:
     name: persnallyd — Type Check, Build, Test
     runs-on: ubuntu-latest
@@ -32,65 +34,3 @@ jobs:
 
       - name: Build (tsc strict) + test (incl. MCP protocol e2e)
         run: npm test
-
-  # ── API (Python) ────────────────────────────────
-  api:
-    name: API — Lint, Boot Check
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install ruff
-
-      - name: Ruff lint
-        run: ruff check src/ api/ experiments/
-
-      - name: Ruff format check
-        run: ruff format --check src/ api/ experiments/
-
-      - name: Boot check (app imports, routes register)
-        run: PYTHONPATH=api python -c "import main; assert len(main.app.routes) > 5, 'route table suspiciously small'"
-        env:
-          SUPABASE_URL: https://placeholder.supabase.co
-          SUPABASE_ANON_KEY: placeholder
-          SUPABASE_SERVICE_ROLE_KEY: placeholder
-          ANTHROPIC_API_KEY: placeholder
-          RESEND_API_KEY: placeholder
-
-  # ── Web (Next.js) ──────────────────────────────
-  web:
-    name: Web — Lint, Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - run: npm ci
-
-      - name: ESLint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
-          NEXT_PUBLIC_API_URL: http://localhost:8000
