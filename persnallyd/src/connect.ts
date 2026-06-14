@@ -40,9 +40,16 @@ export function mcpServerPath(): string {
 export function connectClient(client: Client): string | null {
   const { file, installed } = configPathFor(client);
   if (!installed) return null;
-  const cfg = existsSync(file)
-    ? (JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>)
-    : {};
+  let cfg: Record<string, unknown> = {};
+  if (existsSync(file)) {
+    try {
+      cfg = JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>;
+    } catch {
+      // Never overwrite a config we couldn't parse — that would wipe the user's
+      // other MCP servers. Surface it instead.
+      throw new Error(`${file} is not valid JSON — fix it, then run \`persnallyd connect ${client}\` again`);
+    }
+  }
   const servers = (cfg.mcpServers ??= {}) as Record<string, unknown>;
   servers.persnally = { command: "node", args: [mcpServerPath()] };
   mkdirSync(dirname(file), { recursive: true });
@@ -51,5 +58,13 @@ export function connectClient(client: Client): string | null {
 }
 
 export function connectAll(): { client: Client; file: string | null }[] {
-  return CLIENTS.map((client) => ({ client, file: connectClient(client) }));
+  // One client with a malformed existing config must not abort onboarding for
+  // the others; connectClient throws rather than clobber a file it can't parse.
+  return CLIENTS.map((client) => {
+    try {
+      return { client, file: connectClient(client) };
+    } catch {
+      return { client, file: null };
+    }
+  });
 }

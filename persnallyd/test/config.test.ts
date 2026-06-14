@@ -34,3 +34,13 @@ test("config shows the key masked, never in full", async () => {
 test("set-key rejects non-Anthropic-shaped input", async () => {
   await assert.rejects(run("node", [CLI, "config", "set-key", "hunter2"], { env }), /expected an Anthropic key/);
 });
+
+test("a freshly created key file is owner-only (no world-readable window)", async () => {
+  const fresh = mkdtempSync(join(tmpdir(), "config-fresh-"));
+  try {
+    await run("node", [CLI, "config", "set-key", "sk-ant-fresh-87654321"], { env: { ...process.env, PERSNALLY_DIR: fresh } });
+    assert.equal(statSync(join(fresh, "config.json")).mode & 0o777, 0o600);
+  } finally {
+    rmSync(fresh, { recursive: true, force: true });
+  }
+});
