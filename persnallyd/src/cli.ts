@@ -375,6 +375,11 @@ async function main(): Promise<void> {
       };
       process.on("SIGTERM", shutdown);
       process.on("SIGINT", shutdown);
+      // An always-on daemon must not die silently on a stray error. Log a
+      // rejection and keep serving; on an uncaught exception the process state
+      // is undefined — log and exit so the supervisor (launchd) restarts clean.
+      process.on("unhandledRejection", (e) => console.error("unhandledRejection:", e));
+      process.on("uncaughtException", (e) => { console.error("uncaughtException:", e); process.exit(1); });
       console.error(`persnallyd v${VERSION} listening on 127.0.0.1:${port}`);
       console.error(`Dashboard: http://127.0.0.1:${port}`);
       return;

@@ -5,7 +5,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { newEvent, uuidv7, type PersnallyEvent } from "../events.js";
 
@@ -89,6 +89,9 @@ export function summarizeRepo(repoPath: string, authorEmail?: string): RepoSumma
 export function scanRepos(path: string, authorEmail?: string): RepoSummary[] {
   const direct = summarizeRepo(path, authorEmail);
   if (direct) return [direct];
+  // Not a repo — must be a folder of repos. A file path here is user error,
+  // not a crash (readdirSync would throw ENOTDIR).
+  if (!existsSync(path) || !statSync(path).isDirectory()) return [];
   return readdirSync(path, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => { try { return summarizeRepo(join(path, d.name), authorEmail); } catch { return null; } })

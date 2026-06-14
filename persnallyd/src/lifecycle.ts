@@ -4,7 +4,7 @@
  */
 
 import { execFileSync, spawn } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { DATA_DIR } from "./paths.js";
@@ -46,6 +46,7 @@ export async function startDetached(cliPath: string, port: number): Promise<numb
     stdio: ["ignore", log, log],
     env: process.env,
   });
+  closeSync(log); // the child dup'd it at spawn; don't leak the parent's copy
   child.unref();
 
   for (let i = 0; i < 30; i++) {

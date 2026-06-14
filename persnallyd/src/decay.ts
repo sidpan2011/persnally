@@ -33,7 +33,9 @@ export function topicWeight(signals: WeightSignal[], now: number = Date.now()): 
   const intents = new Map<string, number>();
 
   for (const s of signals) {
-    const days = Math.max((now - Date.parse(s.ts)) / MS_PER_DAY, 0);
+    const parsed = Date.parse(s.ts);
+    if (!Number.isFinite(parsed)) continue; // an unparseable ts must not turn the sum into NaN
+    const days = Math.max((now - parsed) / MS_PER_DAY, 0);
     sum += s.weight * (DEPTH_SCORES[s.depth] ?? 0.3) * Math.exp(-LAMBDA * days);
     sentiment += SENTIMENT_VALUES[s.sentiment] ?? 0;
     intents.set(s.intent, (intents.get(s.intent) ?? 0) + 1);

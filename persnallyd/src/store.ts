@@ -50,6 +50,10 @@ export class EventStore {
     mkdirSync(dirname(path), { recursive: true });
     this.db = new Database(path);
     this.db.pragma("journal_mode = WAL");
+    // The CLI and the daemon each open their own connection; a blocked writer
+    // waits instead of failing fast with SQLITE_BUSY (better-sqlite3 defaults
+    // to 5s — set explicitly with headroom for large rebuilds).
+    this.db.pragma("busy_timeout = 10000");
     this.migrate();
   }
 
@@ -193,7 +197,9 @@ export class EventStore {
         topic: a.topic,
         category: [...a.categories.entries()].sort((x, y) => y[1] - x[1])[0]![0],
         signals: a.signals.length,
-        weight: w.weight,
+        // Guard the NOT NULL column: a non-finite weight would abort the whole
+        // rebuild transaction and wedge the topic view permanently.
+        weight: Number.isFinite(w.weight) ? w.weight : 0,
         sentiment_balance: w.sentiment_balance,
         dominant_intent: w.dominant_intent,
         entities: [...a.entities].slice(0, 20),
@@ -260,7 +266,9 @@ export class EventStore {
   }
 
   forgetAll(): void {
-    this.db.exec("DELETE FROM events; DELETE FROM view_topics;");
+    // Clear the profile too — it's prose derived from now-deleted events.
+    // Leaving it would serve a profile after a full wipe ("deletable for real").
+    this.db.exec("DELETE FROM events; DELETE FROM view_topics; DELETE FROM view_profile;");
   }
 
   close(): void {
