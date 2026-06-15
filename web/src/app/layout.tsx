@@ -1,25 +1,36 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-});
+const sans = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta" });
+const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
+
+const description =
+  "Persnally is a local-first personal context engine. It learns who you are from your AI history and serves that context to every AI tool you use — local-first, across every AI.";
 
 export const metadata: Metadata = {
-  title: "Persnally - Your Tech News, Actually Personalized",
-  description:
-    "AI-powered personalized tech newsletter. Connect your GitHub, set your interests, get 5 curated updates daily.",
+  metadataBase: new URL("https://persnally.com"),
+  title: "Persnally — the context engine for you",
+  description,
+  keywords: ["personal context engine", "local-first", "MCP", "AI memory", "Claude", "ChatGPT", "Cursor"],
+  openGraph: {
+    title: "Persnally — so every AI finally knows you",
+    description,
+    url: "https://persnally.com",
+    siteName: "Persnally",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Persnally — so every AI finally knows you",
+    description,
+  },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} antialiased`}>{children}</body>
+    <html lang="en" className={`dark ${sans.variable} ${mono.variable}`}>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

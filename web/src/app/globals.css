@@ -1,1 +1,219 @@
 @import "tailwindcss";
+
+/* ── Design system — electric blue (#2c67ff) on black ────────── */
+@theme {
+  /* canvas */
+  --color-night: #000000;
+  --color-surface: #08090d;
+  --color-panel: #0e1016;
+  --color-line: #1b1e26;
+
+  /* text */
+  --color-ink: #f5f6f8;
+  --color-mute: #8b90a0;
+  --color-faint: #565b67;
+
+  /* accent — #2c67ff is the single signature blue (fills, text, lines, glow);
+     electric-deep is the one darker shade, for hover/active states */
+  --color-electric: #2c67ff;
+  --color-electric-deep: #275be0;
+
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
+}
+
+/* ── shadcn token bridge — maps shadcn vars to electric (#2c67ff) + black,
+   so any shadcn / 21st.dev component renders in-brand out of the box ──── */
+:root {
+  --background: 0 0% 0%;
+  --foreground: 220 14% 96%;
+  --card: 222 22% 4%;
+  --card-foreground: 220 14% 96%;
+  --muted: 222 18% 8%;
+  --muted-foreground: 220 9% 60%;
+  --primary: 223 100% 59%; /* #2c67ff */
+  --primary-foreground: 0 0% 100%;
+  --border: 223 16% 14%;
+}
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-border: hsl(var(--border));
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    overflow-x: clip;
+  }
+  body {
+    background: var(--color-night);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-electric) 55%, transparent);
+    color: #fff;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line) transparent;
+    /* shadcn convention: bare `border` uses the themed border color */
+    border-color: hsl(var(--border));
+  }
+  /* Tailwind v4 dropped the default pointer on buttons — restore it. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+}
+
+/* ── Atmosphere ──────────────────────────────────────────────── */
+
+/* electric aurora — where #2c67ff reads as pure energy on black */
+.aurora {
+  position: absolute;
+  inset: -25% -10% auto -10%;
+  height: 760px;
+  filter: blur(90px);
+  opacity: 0.55;
+  background:
+    radial-gradient(42% 60% at 25% 28%, color-mix(in oklab, var(--color-electric) 75%, transparent), transparent 70%),
+    radial-gradient(46% 55% at 76% 24%, color-mix(in oklab, var(--color-electric) 45%, transparent), transparent 70%),
+    radial-gradient(40% 50% at 55% 62%, color-mix(in oklab, var(--color-electric) 55%, transparent), transparent 70%);
+  background-size: 200% 200%;
+  animation: aurora 16s ease-in-out infinite alternate;
+}
+@keyframes aurora {
+  0% {
+    background-position: 0% 50%;
+    transform: rotate(-2deg) scale(1.05);
+  }
+  100% {
+    background-position: 100% 50%;
+    transform: rotate(3deg) scale(1.15);
+  }
+}
+
+/* ── Type & accents ──────────────────────────────────────────── */
+
+/* bright electric sheen — stays readable on black (no dark dip) */
+.text-gradient {
+  background: linear-gradient(
+    100deg,
+    #ffffff 8%,
+    color-mix(in oklab, var(--color-electric) 70%, #ffffff) 50%,
+    #ffffff 92%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sheen 6s linear infinite;
+}
+@keyframes sheen {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* electric gradient hairline */
+.border-glow {
+  position: relative;
+}
+.border-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(140deg, color-mix(in oklab, var(--color-electric) 80%, transparent), transparent 42%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* shimmer sweep for the primary CTA */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.22) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: shimmer 3.2s ease-in-out infinite;
+}
+@keyframes shimmer {
+  60%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ── Marquee ─────────────────────────────────────────────────── */
+.marquee {
+  display: flex;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+.marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  gap: 3.5rem;
+  padding-right: 3.5rem;
+  animation: marquee 26s linear infinite;
+}
+@keyframes marquee {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* ── Entrance ────────────────────────────────────────────────── */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  opacity: 0;
+  animation: rise 0.85s cubic-bezier(0.2, 0.65, 0.2, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .aurora,
+  .text-gradient,
+  .shimmer::after,
+  .marquee-track {
+    animation: none !important;
+  }
+  .rise {
+    opacity: 1;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}

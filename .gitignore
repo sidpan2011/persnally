@@ -133,3 +133,4 @@ web/.env.local
 .ruff_cache/
 persnallyd/README.md
 persnallyd/LICENSE
+.gstack/
