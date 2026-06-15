@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ── Design system — electric blue (#0100fe) on black ────────── */
+/* ── Design system — electric blue (#2c67ff) on black ────────── */
 @theme {
   /* canvas */
   --color-night: #000000;
@@ -13,17 +13,16 @@
   --color-mute: #8b90a0;
   --color-faint: #565b67;
 
-  /* accent — #0100fe is the signature (fills + glow); volt is the
-     readable tint for text/lines; ice is the lightest gradient stop */
-  --color-electric: #0100fe;
-  --color-volt: #6b6bff;
-  --color-ice: #c2c7ff;
+  /* accent — #2c67ff is the single signature blue (fills, text, lines, glow);
+     electric-deep is the one darker shade, for hover/active states */
+  --color-electric: #2c67ff;
+  --color-electric-deep: #275be0;
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", monospace;
 }
 
-/* ── shadcn token bridge — maps shadcn vars to electric (#0100fe) + black,
+/* ── shadcn token bridge — maps shadcn vars to electric (#2c67ff) + black,
    so any shadcn / 21st.dev component renders in-brand out of the box ──── */
 :root {
   --background: 0 0% 0%;
@@ -32,7 +31,7 @@
   --card-foreground: 220 14% 96%;
   --muted: 222 18% 8%;
   --muted-foreground: 220 9% 60%;
-  --primary: 240 100% 50%; /* #0100fe */
+  --primary: 223 100% 59%; /* #2c67ff */
   --primary-foreground: 0 0% 100%;
   --border: 223 16% 14%;
 }
@@ -81,16 +80,7 @@
 
 /* ── Atmosphere ──────────────────────────────────────────────── */
 
-.bg-grid {
-  background-image:
-    linear-gradient(to right, color-mix(in oklab, var(--color-line) 80%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in oklab, var(--color-line) 80%, transparent) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 25%, transparent 75%);
-  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 25%, transparent 75%);
-}
-
-/* electric aurora — where #0100fe reads as pure energy on black */
+/* electric aurora — where #2c67ff reads as pure energy on black */
 .aurora {
   position: absolute;
   inset: -25% -10% auto -10%;
@@ -99,7 +89,7 @@
   opacity: 0.55;
   background:
     radial-gradient(42% 60% at 25% 28%, color-mix(in oklab, var(--color-electric) 75%, transparent), transparent 70%),
-    radial-gradient(46% 55% at 76% 24%, color-mix(in oklab, var(--color-volt) 55%, transparent), transparent 70%),
+    radial-gradient(46% 55% at 76% 24%, color-mix(in oklab, var(--color-electric) 45%, transparent), transparent 70%),
     radial-gradient(40% 50% at 55% 62%, color-mix(in oklab, var(--color-electric) 55%, transparent), transparent 70%);
   background-size: 200% 200%;
   animation: aurora 16s ease-in-out infinite alternate;
@@ -121,11 +111,9 @@
 .text-gradient {
   background: linear-gradient(
     100deg,
-    #ffffff 5%,
-    var(--color-ice) 28%,
-    var(--color-volt) 50%,
-    var(--color-ice) 72%,
-    #ffffff 95%
+    #ffffff 8%,
+    color-mix(in oklab, var(--color-electric) 70%, #ffffff) 50%,
+    #ffffff 92%
   );
   background-size: 200% auto;
   -webkit-background-clip: text;
@@ -198,17 +186,6 @@
   }
 }
 
-/* ── Animated beam — a pulse travels the pipeline ────────────── */
-.beam-line {
-  stroke-dasharray: 6 10;
-  animation: beam 1.4s linear infinite;
-}
-@keyframes beam {
-  to {
-    stroke-dashoffset: -32;
-  }
-}
-
 /* ── Entrance ────────────────────────────────────────────────── */
 @keyframes rise {
   from {
@@ -230,8 +207,7 @@
   .aurora,
   .text-gradient,
   .shimmer::after,
-  .marquee-track,
-  .beam-line {
+  .marquee-track {
     animation: none !important;
   }
   .rise {

@@ -23,7 +23,7 @@ export function SpotlightCard({
       }}
       onMouseEnter={() => setOn(true)}
       onMouseLeave={() => setOn(false)}
-      className={`group relative overflow-hidden rounded-2xl border border-line bg-surface transition-colors duration-300 hover:border-volt/40 ${className}`}
+      className={`group relative overflow-hidden rounded-2xl border border-line bg-surface transition-colors duration-300 hover:border-electric/40 ${className}`}
     >
       <div
         aria-hidden

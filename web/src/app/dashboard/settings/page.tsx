@@ -79,7 +79,7 @@ export default function SettingsPage() {
   return (
     <div className="bg-night text-ink max-w-2xl space-y-8">
       <div>
-        <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-2">
+        <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-2">
           Settings
         </div>
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Settings</h1>
@@ -93,7 +93,7 @@ export default function SettingsPage() {
         <h2 className="font-semibold tracking-tight text-ink mb-4">Account</h2>
         <div className="space-y-3">
           <div>
-            <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt block mb-1">Email</label>
+            <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric block mb-1">Email</label>
             <div className="text-sm text-ink">{email}</div>
           </div>
         </div>
@@ -104,11 +104,11 @@ export default function SettingsPage() {
         <h2 className="font-semibold tracking-tight text-ink mb-4">Digest Preferences</h2>
         <div className="space-y-4">
           <div>
-            <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt block mb-1">Experience Level</label>
+            <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric block mb-1">Experience Level</label>
             <select
               value={prefs?.experience_level || "intermediate"}
               onChange={(e) => setPrefs(p => p ? { ...p, experience_level: e.target.value } : p)}
-              className="w-full border border-line bg-panel text-ink rounded-lg px-3 py-2 text-sm focus:border-volt/30 focus:outline-none"
+              className="w-full border border-line bg-panel text-ink rounded-lg px-3 py-2 text-sm focus:border-electric/30 focus:outline-none"
             >
               <option value="beginner">Beginner</option>
               <option value="intermediate">Intermediate</option>
@@ -118,11 +118,11 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt block mb-1">Content Style</label>
+            <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric block mb-1">Content Style</label>
             <select
               value={prefs?.content_style || "technical_deep_dive"}
               onChange={(e) => setPrefs(p => p ? { ...p, content_style: e.target.value } : p)}
-              className="w-full border border-line bg-panel text-ink rounded-lg px-3 py-2 text-sm focus:border-volt/30 focus:outline-none"
+              className="w-full border border-line bg-panel text-ink rounded-lg px-3 py-2 text-sm focus:border-electric/30 focus:outline-none"
             >
               <option value="technical_deep_dive">Deep Technical</option>
               <option value="technical_with_business_context">Technical + Business</option>
@@ -131,13 +131,13 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt block mb-1">Location (optional)</label>
+            <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric block mb-1">Location (optional)</label>
             <input
               type="text"
               value={prefs?.location || ""}
               onChange={(e) => setPrefs(p => p ? { ...p, location: e.target.value } : p)}
               placeholder="e.g., San Francisco, USA"
-              className="w-full border border-line bg-panel text-ink placeholder:text-faint rounded-lg px-3 py-2 text-sm focus:border-volt/30 focus:outline-none"
+              className="w-full border border-line bg-panel text-ink placeholder:text-faint rounded-lg px-3 py-2 text-sm focus:border-electric/30 focus:outline-none"
             />
           </div>
         </div>
@@ -150,7 +150,7 @@ export default function SettingsPage() {
           Install the MCP server to start building your interest graph from Claude conversations.
         </p>
         <div className="rounded-xl border border-line bg-night p-4 font-mono text-[13px] text-ink mb-3">
-          <span className="text-volt">$</span> npm install -g persnally
+          <span className="text-electric">$</span> npm install -g persnally
         </div>
         <p className="text-xs text-faint">
           Add to Claude Desktop config, then tell Claude: &quot;Set my Persnally email to {email}&quot;
@@ -178,11 +178,11 @@ export default function SettingsPage() {
         <button
           onClick={savePrefs}
           disabled={saving}
-          className="rounded-lg bg-electric px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-volt disabled:opacity-50"
+          className="rounded-lg bg-electric px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-electric-deep disabled:opacity-50"
         >
           {saving ? "Saving..." : "Save Settings"}
         </button>
-        {saved && <span className="text-sm text-volt">Saved!</span>}
+        {saved && <span className="text-sm text-electric">Saved!</span>}
       </div>
     </div>
   );

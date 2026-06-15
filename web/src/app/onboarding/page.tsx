@@ -157,7 +157,7 @@ export default function OnboardingPage() {
         {/* Step 1: GitHub Connected */}
         {step === 1 && (
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-3">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-3">
               Step 01
             </p>
             <h2 className="text-2xl font-semibold tracking-tight text-ink mb-2">
@@ -169,7 +169,7 @@ export default function OnboardingPage() {
             </p>
 
             <div className="rounded-2xl border border-line bg-surface p-4 flex items-center gap-4 mb-8">
-              <div className="w-10 h-10 bg-panel rounded-full flex items-center justify-center text-volt">
+              <div className="w-10 h-10 bg-panel rounded-full flex items-center justify-center text-electric">
                 <svg
                   className="w-5 h-5"
                   fill="currentColor"
@@ -182,7 +182,7 @@ export default function OnboardingPage() {
                 <div className="font-medium text-ink">
                   @{githubUsername || "loading..."}
                 </div>
-                <div className="font-mono text-xs uppercase tracking-[0.18em] text-volt">
+                <div className="font-mono text-xs uppercase tracking-[0.18em] text-electric">
                   Connected
                 </div>
               </div>
@@ -190,7 +190,7 @@ export default function OnboardingPage() {
 
             <button
               onClick={() => setStep(2)}
-              className="w-full rounded-lg bg-electric py-3 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-volt cursor-pointer"
+              className="w-full rounded-lg bg-electric py-3 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-electric-deep cursor-pointer"
             >
               Continue
             </button>
@@ -200,7 +200,7 @@ export default function OnboardingPage() {
         {/* Step 2: Interests */}
         {step === 2 && (
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-3">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-3">
               Step 02
             </p>
             <h2 className="text-2xl font-semibold tracking-tight text-ink mb-2">
@@ -218,7 +218,7 @@ export default function OnboardingPage() {
                   className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
                     interests.includes(interest)
                       ? "bg-electric text-white border-electric shadow-[0_0_20px_-8px_var(--color-electric)]"
-                      : "bg-surface text-ink border-line hover:border-volt/40"
+                      : "bg-surface text-ink border-line hover:border-electric/40"
                   }`}
                 >
                   {interest}
@@ -233,7 +233,7 @@ export default function OnboardingPage() {
                 onChange={(e) => setCustomInterest(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addCustomInterest()}
                 placeholder="Add custom interest..."
-                className="flex-1 rounded-lg border border-line bg-night px-4 py-2 text-sm text-ink placeholder:text-faint focus:border-volt focus:outline-none"
+                className="flex-1 rounded-lg border border-line bg-night px-4 py-2 text-sm text-ink placeholder:text-faint focus:border-electric focus:outline-none"
               />
               <button
                 onClick={addCustomInterest}
@@ -253,7 +253,7 @@ export default function OnboardingPage() {
               <button
                 onClick={() => setStep(3)}
                 disabled={interests.length < 3}
-                className="flex-1 rounded-lg bg-electric py-3 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-volt disabled:bg-panel disabled:text-faint disabled:shadow-none disabled:cursor-not-allowed cursor-pointer"
+                className="flex-1 rounded-lg bg-electric py-3 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-electric-deep disabled:bg-panel disabled:text-faint disabled:shadow-none disabled:cursor-not-allowed cursor-pointer"
               >
                 Continue
               </button>
@@ -264,7 +264,7 @@ export default function OnboardingPage() {
         {/* Step 3: Preferences */}
         {step === 3 && (
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-3">
+            <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-3">
               Step 03
             </p>
             <h2 className="text-2xl font-semibold tracking-tight text-ink mb-2">
@@ -276,7 +276,7 @@ export default function OnboardingPage() {
 
             {/* Experience Level */}
             <div className="mb-6">
-              <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-3 block">
+              <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-3 block">
                 Experience Level
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -286,8 +286,8 @@ export default function OnboardingPage() {
                     onClick={() => setExperienceLevel(level.value)}
                     className={`p-3 rounded-lg border text-left transition-colors cursor-pointer ${
                       experienceLevel === level.value
-                        ? "border-volt/30 bg-panel"
-                        : "border-line bg-surface hover:border-volt/40"
+                        ? "border-electric/30 bg-panel"
+                        : "border-line bg-surface hover:border-electric/40"
                     }`}
                   >
                     <div className="font-medium text-sm text-ink">{level.label}</div>
@@ -299,7 +299,7 @@ export default function OnboardingPage() {
 
             {/* Content Style */}
             <div className="mb-6">
-              <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-3 block">
+              <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-3 block">
                 Content Style
               </label>
               <div className="space-y-2">
@@ -309,8 +309,8 @@ export default function OnboardingPage() {
                     onClick={() => setContentStyle(style.value)}
                     className={`w-full p-3 rounded-lg border text-left transition-colors cursor-pointer ${
                       contentStyle === style.value
-                        ? "border-volt/30 bg-panel"
-                        : "border-line bg-surface hover:border-volt/40"
+                        ? "border-electric/30 bg-panel"
+                        : "border-line bg-surface hover:border-electric/40"
                     }`}
                   >
                     <div className="font-medium text-sm text-ink">{style.label}</div>
@@ -322,7 +322,7 @@ export default function OnboardingPage() {
 
             {/* Location */}
             <div className="mb-6">
-              <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-2 block">
+              <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-2 block">
                 Location (for local events & news)
               </label>
               <input
@@ -330,13 +330,13 @@ export default function OnboardingPage() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g. San Francisco, USA"
-                className="w-full rounded-lg border border-line bg-night px-4 py-2 text-sm text-ink placeholder:text-faint focus:border-volt focus:outline-none"
+                className="w-full rounded-lg border border-line bg-night px-4 py-2 text-sm text-ink placeholder:text-faint focus:border-electric focus:outline-none"
               />
             </div>
 
             {/* Opportunity Types */}
             <div className="mb-8">
-              <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-3 block">
+              <label className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-3 block">
                 I want to hear about
               </label>
               <div className="flex flex-wrap gap-2">
@@ -348,7 +348,7 @@ export default function OnboardingPage() {
                       className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors capitalize cursor-pointer ${
                         opportunityTypes.includes(type)
                           ? "bg-electric text-white border-electric shadow-[0_0_20px_-8px_var(--color-electric)]"
-                          : "bg-surface text-ink border-line hover:border-volt/40"
+                          : "bg-surface text-ink border-line hover:border-electric/40"
                       }`}
                     >
                       {type}
@@ -368,7 +368,7 @@ export default function OnboardingPage() {
               <button
                 onClick={handleComplete}
                 disabled={loading}
-                className="flex-1 rounded-lg bg-electric py-3 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-volt disabled:bg-panel disabled:text-faint disabled:shadow-none cursor-pointer"
+                className="flex-1 rounded-lg bg-electric py-3 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-electric-deep disabled:bg-panel disabled:text-faint disabled:shadow-none cursor-pointer"
               >
                 {loading ? "Setting up..." : "Start Getting Updates"}
               </button>

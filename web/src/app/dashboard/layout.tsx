@@ -44,7 +44,7 @@ export default function DashboardLayout({
             href="/dashboard"
             className="text-lg font-semibold tracking-tight text-ink lowercase"
           >
-            persnally<span className="text-volt">.</span>
+            persnally<span className="text-electric">.</span>
           </Link>
 
           <nav className="flex items-center gap-1">
@@ -59,7 +59,7 @@ export default function DashboardLayout({
                   href={item.href}
                   className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     active
-                      ? "text-volt bg-panel"
+                      ? "text-electric bg-panel"
                       : "text-mute hover:text-ink hover:bg-surface"
                   }`}
                 >
@@ -78,7 +78,7 @@ export default function DashboardLayout({
                   </svg>
                   <span className="hidden md:inline">{item.label}</span>
                   {active && (
-                    <span className="absolute -bottom-[13px] left-1/2 -translate-x-1/2 h-px w-8 bg-gradient-to-r from-electric to-volt" />
+                    <span className="absolute -bottom-[13px] left-1/2 -translate-x-1/2 h-px w-8 bg-gradient-to-r from-electric to-electric" />
                   )}
                 </Link>
               );

@@ -95,7 +95,7 @@ export default function PreferencesPage() {
 
   return (
     <div className="max-w-2xl bg-night text-ink">
-      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt">Preferences</p>
+      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric">Preferences</p>
       <h1 className="text-2xl text-ink font-semibold tracking-tight mt-1 mb-6">Preferences</h1>
 
       {/* Interests */}
@@ -108,8 +108,8 @@ export default function PreferencesPage() {
               onClick={() => toggleInterest(opt)}
               className={`px-2.5 py-1 rounded-md border font-mono text-[12px] transition-colors cursor-pointer ${
                 interests.includes(opt.toLowerCase())
-                  ? "border-volt/40 bg-electric/15 text-volt"
-                  : "border-line bg-panel text-mute hover:border-volt/30"
+                  ? "border-electric/40 bg-electric/15 text-electric"
+                  : "border-line bg-panel text-mute hover:border-electric/30"
               }`}
             >
               {opt}
@@ -118,7 +118,7 @@ export default function PreferencesPage() {
           {interests
             .filter((i) => !INTEREST_OPTIONS.map((o) => o.toLowerCase()).includes(i))
             .map((custom) => (
-              <span key={custom} className="px-2.5 py-1 rounded-md font-mono text-[12px] border border-volt/40 bg-electric/15 text-volt">
+              <span key={custom} className="px-2.5 py-1 rounded-md font-mono text-[12px] border border-electric/40 bg-electric/15 text-electric">
                 {custom}
                 <button onClick={() => setInterests((p) => p.filter((x) => x !== custom))} className="ml-1 cursor-pointer">&times;</button>
               </span>
@@ -130,9 +130,9 @@ export default function PreferencesPage() {
             onChange={(e) => setCustomInterest(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addCustom()}
             placeholder="Add custom..."
-            className="flex-1 bg-night border border-line rounded-lg px-3 py-1.5 text-sm text-ink placeholder:text-faint focus:border-volt focus:outline-none"
+            className="flex-1 bg-night border border-line rounded-lg px-3 py-1.5 text-sm text-ink placeholder:text-faint focus:border-electric focus:outline-none"
           />
-          <button onClick={addCustom} className="px-3 py-1.5 bg-panel border border-line rounded-lg text-sm text-mute hover:border-volt/30 hover:text-volt transition-colors cursor-pointer">Add</button>
+          <button onClick={addCustom} className="px-3 py-1.5 bg-panel border border-line rounded-lg text-sm text-mute hover:border-electric/30 hover:text-electric transition-colors cursor-pointer">Add</button>
         </div>
       </section>
 
@@ -142,7 +142,7 @@ export default function PreferencesPage() {
         <select
           value={experienceLevel}
           onChange={(e) => setExperienceLevel(e.target.value)}
-          className="bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink focus:border-volt focus:outline-none"
+          className="bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink focus:border-electric focus:outline-none"
         >
           <option value="beginner">Beginner</option>
           <option value="intermediate">Intermediate</option>
@@ -157,7 +157,7 @@ export default function PreferencesPage() {
         <select
           value={contentStyle}
           onChange={(e) => setContentStyle(e.target.value)}
-          className="bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink focus:border-volt focus:outline-none"
+          className="bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink focus:border-electric focus:outline-none"
         >
           <option value="technical">Deep Technical</option>
           <option value="technical_with_business_context">Technical + Business</option>
@@ -172,7 +172,7 @@ export default function PreferencesPage() {
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           placeholder="e.g. San Francisco, USA"
-          className="w-full bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-volt focus:outline-none"
+          className="w-full bg-night border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-electric focus:outline-none"
         />
       </section>
 
@@ -190,8 +190,8 @@ export default function PreferencesPage() {
               }
               className={`px-2.5 py-1 rounded-md border font-mono text-[12px] transition-colors capitalize cursor-pointer ${
                 opportunityTypes.includes(type)
-                  ? "border-volt/40 bg-electric/15 text-volt"
-                  : "border-line bg-panel text-mute hover:border-volt/30"
+                  ? "border-electric/40 bg-electric/15 text-electric"
+                  : "border-line bg-panel text-mute hover:border-electric/30"
               }`}
             >
               {type}
@@ -204,7 +204,7 @@ export default function PreferencesPage() {
       <button
         onClick={handleSave}
         disabled={saving}
-        className="rounded-lg bg-electric px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-volt disabled:opacity-50 cursor-pointer"
+        className="rounded-lg bg-electric px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-electric-deep disabled:opacity-50 cursor-pointer"
       >
         {saving ? "Saving..." : saved ? "Saved!" : "Save Preferences"}
       </button>
