@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
+import { OpenPanelComponent } from "@openpanel/nextjs";
 import "./globals.css";
+
+// OpenPanel client id (public browser key) — kept out of source. Set
+// NEXT_PUBLIC_OPENPANEL_CLIENT_ID in .env.local for dev and in your host for prod.
+const OPENPANEL_CLIENT_ID = process.env.NEXT_PUBLIC_OPENPANEL_CLIENT_ID;
 
 const sans = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta" });
 const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
@@ -30,7 +35,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`dark ${sans.variable} ${mono.variable}`}>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {OPENPANEL_CLIENT_ID && (
+          <OpenPanelComponent
+            clientId={OPENPANEL_CLIENT_ID}
+            trackScreenViews
+            trackOutgoingLinks
+            trackAttributes
+          />
+        )}
+        {children}
+      </body>
     </html>
   );
 }
