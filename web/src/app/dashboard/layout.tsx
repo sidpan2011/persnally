@@ -37,14 +37,14 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-night text-ink">
+      <header className="sticky top-0 z-50 border-b border-line/60 bg-night/70 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link
             href="/dashboard"
-            className="text-lg font-bold tracking-tight text-black uppercase"
+            className="text-lg font-semibold tracking-tight text-ink lowercase"
           >
-            Persnally
+            persnally<span className="text-electric">.</span>
           </Link>
 
           <nav className="flex items-center gap-1">
@@ -57,10 +57,10 @@ export default function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`relative flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     active
-                      ? "bg-gray-100 text-black"
-                      : "text-gray-500 hover:text-black hover:bg-gray-50"
+                      ? "text-electric bg-panel"
+                      : "text-mute hover:text-ink hover:bg-surface"
                   }`}
                 >
                   <svg
@@ -77,12 +77,15 @@ export default function DashboardLayout({
                     />
                   </svg>
                   <span className="hidden md:inline">{item.label}</span>
+                  {active && (
+                    <span className="absolute -bottom-[13px] left-1/2 -translate-x-1/2 h-px w-8 bg-gradient-to-r from-electric to-electric" />
+                  )}
                 </Link>
               );
             })}
             <button
               onClick={handleSignOut}
-              className="ml-2 text-sm text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+              className="ml-2 text-sm text-faint hover:text-ink transition-colors cursor-pointer"
             >
               Sign out
             </button>
