@@ -62,15 +62,15 @@ interface SkillSnapshot {
 
 const DOMAIN_COLORS: Record<string, string> = {
   frontend: "bg-electric",
-  backend: "bg-volt",
+  backend: "bg-electric",
   ai_ml: "bg-electric/70",
-  data_science: "bg-volt/70",
+  data_science: "bg-electric/70",
   devops: "bg-electric/50",
-  mobile: "bg-volt/50",
+  mobile: "bg-electric/50",
   database: "bg-electric/40",
-  systems: "bg-volt/40",
+  systems: "bg-electric/40",
   blockchain: "bg-electric/30",
-  security: "bg-volt/30",
+  security: "bg-electric/30",
   general: "bg-mute",
 };
 
@@ -89,21 +89,21 @@ const DOMAIN_LABELS: Record<string, string> = {
 };
 
 const GAP_CATEGORY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  critical: { bg: "bg-panel border border-volt/30", text: "text-volt", label: "Critical" },
+  critical: { bg: "bg-panel border border-electric/30", text: "text-electric", label: "Critical" },
   recommended: { bg: "bg-panel border border-line", text: "text-ink", label: "Recommended" },
-  emerging: { bg: "bg-panel border border-volt/30", text: "text-volt", label: "Emerging" },
+  emerging: { bg: "bg-panel border border-electric/30", text: "text-electric", label: "Emerging" },
   complementary: { bg: "bg-panel border border-line", text: "text-mute", label: "Complementary" },
 };
 
 function SkillBar({ name, level, category, recent }: { name: string; level: number; category: string; recent: boolean }) {
   const width = Math.max(level * 100, 4);
-  const categoryColor = category === "language" ? "bg-gradient-to-r from-electric to-volt" :
+  const categoryColor = category === "language" ? "bg-gradient-to-r from-electric to-electric" :
     category === "frontend" ? "bg-electric" :
-    category === "backend" ? "bg-volt" :
+    category === "backend" ? "bg-electric" :
     category === "ai_ml" ? "bg-electric/70" :
-    category === "database" ? "bg-volt/70" :
+    category === "database" ? "bg-electric/70" :
     category === "devops" ? "bg-electric/50" :
-    category === "testing" ? "bg-volt/50" :
+    category === "testing" ? "bg-electric/50" :
     category === "mobile" ? "bg-electric/40" :
     "bg-mute";
 
@@ -111,7 +111,7 @@ function SkillBar({ name, level, category, recent }: { name: string; level: numb
     <div className="flex items-center gap-3 group">
       <div className="w-32 text-sm font-medium text-ink truncate" title={name}>
         {name}
-        {recent && <span className="ml-1 text-volt text-xs" title="Used recently">*</span>}
+        {recent && <span className="ml-1 text-electric text-xs" title="Used recently">*</span>}
       </div>
       <div className="flex-1 bg-line rounded-full h-2.5 overflow-hidden">
         <div
@@ -208,7 +208,7 @@ export default function SkillsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-2">
+          <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-2">
             Skill DNA
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-ink">Skill DNA</h1>
@@ -219,7 +219,7 @@ export default function SkillsPage() {
         <button
           onClick={handleAnalyze}
           disabled={analyzing}
-          className="flex items-center gap-2 rounded-lg bg-electric px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-volt disabled:opacity-50 cursor-pointer"
+          className="flex items-center gap-2 rounded-lg bg-electric px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-electric-deep disabled:opacity-50 cursor-pointer"
         >
           {analyzing ? (
             <>
@@ -242,10 +242,10 @@ export default function SkillsPage() {
 
       {/* Analyzing state */}
       {analyzing && (
-        <div className="rounded-2xl border border-volt/30 bg-surface p-6 mb-8">
+        <div className="rounded-2xl border border-electric/30 bg-surface p-6 mb-8">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-panel border border-line rounded-full flex items-center justify-center">
-              <svg className="w-5 h-5 animate-spin text-volt" fill="none" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 animate-spin text-electric" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -270,7 +270,7 @@ export default function SkillsPage() {
         /* Empty state — first time user */
         <div className="text-center py-20">
           <div className="w-20 h-20 bg-panel border border-line rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-volt" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+            <svg className="w-10 h-10 text-electric" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
             </svg>
           </div>
@@ -282,7 +282,7 @@ export default function SkillsPage() {
           <button
             onClick={handleAnalyze}
             disabled={analyzing}
-            className="rounded-lg bg-electric px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-volt cursor-pointer"
+            className="rounded-lg bg-electric px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-electric-deep cursor-pointer"
           >
             Run First Analysis
           </button>
@@ -294,7 +294,7 @@ export default function SkillsPage() {
           <div className="rounded-2xl border border-line bg-surface p-6">
             <div className="flex items-start justify-between mb-4">
               <div>
-                <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-1">
+                <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-1">
                   Your Technical Identity
                 </div>
                 <div className="text-xl font-semibold tracking-tight text-ink">
@@ -465,7 +465,7 @@ export default function SkillsPage() {
                       <div className="flex items-center gap-2">
                         <div className="w-16 bg-line rounded-full h-1.5">
                           <div
-                            className="h-full bg-gradient-to-r from-electric to-volt rounded-full"
+                            className="h-full bg-gradient-to-r from-electric to-electric rounded-full"
                             style={{ width: `${gap.gap_score * 100}%` }}
                           />
                         </div>

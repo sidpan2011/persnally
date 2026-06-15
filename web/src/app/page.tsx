@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { CopyCommand } from "./_components/CopyCommand";
+import { HeroHub } from "./_components/HeroHub";
+import { AnimatedGridPattern } from "@/components/magicui/animated-grid-pattern";
 import { SetupTabs } from "./_components/SetupTabs";
 import { SpotlightCard } from "./_components/SpotlightCard";
 import { Features } from "@/components/ui/features-10";
 import { GithubIcon, NpmIcon, Glyph, TOOLS } from "@/components/ui/logos";
-import { FragmentedTools, LocalViz, ProvenanceViz, DeletableViz, SourceViz } from "./_components/visuals";
-import { ArrowUpRight, Check, Cpu, Download, Plug, X } from "lucide-react";
+import { RepetitionFeed } from "./_components/RepetitionFeed";
+import { ArrowUpRight, Check, ChevronRight, Cpu, Database, Download, FileJson, Plug, Star, X } from "lucide-react";
 
 const EXT = { target: "_blank", rel: "noopener noreferrer" } as const;
 const arrowCls =
@@ -38,14 +40,14 @@ export default function Home() {
 function Wordmark({ className = "" }: { className?: string }) {
   return (
     <span className={`font-semibold tracking-tight text-ink ${className}`}>
-      persnally<span className="text-volt">.</span>
+      persnally<span className="text-electric">.</span>
     </span>
   );
 }
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt">{children}</span>
+    <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric">{children}</span>
   );
 }
 
@@ -93,7 +95,7 @@ function Nav() {
         </nav>
         <a
           href="#start"
-          className="rounded-lg bg-electric px-4 py-2 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-volt"
+          className="rounded-lg bg-electric px-4 py-2 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-electric-deep"
         >
           Get started
         </a>
@@ -107,15 +109,20 @@ function Nav() {
 function Hero() {
   return (
     <Section className="relative pt-24 pb-24 sm:pt-32">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[760px] overflow-hidden">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[820px] overflow-hidden">
         <div className="aurora" />
-        <div className="absolute inset-0 bg-grid" />
+        <AnimatedGridPattern
+          numSquares={34}
+          maxOpacity={0.15}
+          duration={4}
+          className="[mask-image:radial-gradient(640px_circle_at_50%_170px,white,transparent)] text-electric/35 stroke-electric/10"
+        />
       </div>
 
       <div className="mx-auto max-w-4xl text-center">
         <div className="rise" style={{ animationDelay: "0ms" }}>
           <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1 font-mono text-[11px] text-mute backdrop-blur">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-volt" />
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-electric" />
             The context engine for you
           </span>
         </div>
@@ -129,7 +136,7 @@ function Hero() {
         </h1>
 
         <p
-          className="rise mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-mute sm:text-xl"
+          className="rise mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-mute"
           style={{ animationDelay: "160ms" }}
         >
           Persnally learns who you are from your AI history — your chats, your code, your decisions —
@@ -167,73 +174,9 @@ function Hero() {
       </div>
 
       <div className="rise mt-16 sm:mt-20" style={{ animationDelay: "340ms" }}>
-        <MirrorCard />
+        <HeroHub />
       </div>
     </Section>
-  );
-}
-
-/* The product, as the hero visual: an evidence-linked profile + decayed interests */
-function MirrorCard() {
-  const topics = [
-    { name: "event sourcing", w: 0.92 },
-    { name: "local-first software", w: 0.81 },
-    { name: "go-to-market", w: 0.58 },
-    { name: "rust", w: 0.44 },
-  ];
-  return (
-    <div className="border-glow mx-auto max-w-4xl overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_50px_150px_-50px_rgba(1,0,254,0.5)]">
-      <div className="flex items-center gap-2 border-b border-line/70 bg-panel/50 px-4 py-3">
-        <span className="h-2.5 w-2.5 rounded-full bg-line" />
-        <span className="h-2.5 w-2.5 rounded-full bg-line" />
-        <span className="h-2.5 w-2.5 rounded-full bg-line" />
-        <span className="ml-2 font-mono text-[11px] text-faint">persnally — localhost:4983</span>
-      </div>
-
-      <div className="grid gap-px bg-line/60 md:grid-cols-5">
-        <div className="bg-surface p-6 md:col-span-3 md:p-8">
-          <p className="font-mono text-[11px] uppercase tracking-wider text-faint">Your profile</p>
-          <p className="mt-3 text-lg font-medium leading-snug text-ink">
-            A builder shipping a local-first context engine — moves fast, decides from first
-            principles, and guards user trust as a non-negotiable.
-          </p>
-          <div className="mt-5 rounded-xl border border-line bg-night/40 p-4">
-            <p className="text-sm leading-relaxed text-mute">
-              Prefers the smallest design that solves the problem; reaches for SQLite and plain
-              files before frameworks.
-            </p>
-            <div className="mt-3 flex items-center gap-2">
-              <span className="font-mono text-[11px] text-volt">↳ why does it think this?</span>
-              <span className="rounded-md border border-line px-2 py-0.5 font-mono text-[11px] text-faint">
-                7 events
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-surface p-6 md:col-span-2 md:p-8">
-          <p className="font-mono text-[11px] uppercase tracking-wider text-faint">
-            Interests · decay-weighted
-          </p>
-          <ul className="mt-4 space-y-4">
-            {topics.map((t) => (
-              <li key={t.name}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-sm text-ink">{t.name}</span>
-                  <span className="font-mono text-[11px] text-faint">{t.w.toFixed(2)}</span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line/60">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-electric to-volt"
-                    style={{ width: `${Math.max(t.w * 100, 6)}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -244,7 +187,7 @@ function Marquee() {
   return (
     <Section className="py-10">
       <p className="mb-7 text-center font-mono text-[11px] uppercase tracking-[0.18em] text-faint">
-        Reads your context in the tools you already use
+        Works with the AI tools you already use
       </p>
       <div className="marquee">
         {[0, 1].map((dup) => (
@@ -274,18 +217,20 @@ function Wedge() {
         <div>
           <Eyebrow>The problem</Eyebrow>
           <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
-            Every AI is brilliant — and amnesiac.
+            You explain yourself.
+            <br className="hidden sm:block" /> Again. And again.
           </h2>
           <p className="mt-6 text-lg leading-relaxed text-mute">
             ChatGPT doesn&apos;t know what you told Claude. Your coding agent relearns your stack
-            every session, or interrupts to ask. Each tool meets you as a stranger.
+            every session, or stops to ask. So you paste the same context — your tools, your
+            conventions, your taste — into tool after tool.
           </p>
           <p className="mt-4 text-[15px] leading-relaxed text-faint">
-            And the model vendors can&apos;t fix it — their business is keeping you inside their
-            walls, not sharing you across the others.
+            Each meets you as a stranger. And the model vendors can&apos;t fix it — their business
+            is keeping you inside their walls, not sharing you across them.
           </p>
         </div>
-        <FragmentedTools />
+        <RepetitionFeed />
       </div>
     </Section>
   );
@@ -297,21 +242,27 @@ function HowItWorks() {
   const steps = [
     {
       k: "01",
+      label: "Import",
       Icon: Download,
       t: "Import your history",
       d: "One command finds your Claude & ChatGPT exports, your Claude Code sessions, and your git repos, and reads them.",
+      visual: <ImportViz />,
     },
     {
       k: "02",
+      label: "Learn · local",
       Icon: Cpu,
       t: "It learns, on your machine",
       d: "A local daemon turns that activity into a structured, evidence-linked model of who you are. Nothing leaves your laptop.",
+      visual: <LearnViz />,
     },
     {
       k: "03",
+      label: "Serve · MCP",
       Icon: Plug,
       t: "Every AI reads it",
       d: "Connected over MCP — the open protocol your AI tools already speak — Claude, Cursor, and your agents read your context the moment a session starts.",
+      visual: <ServeViz />,
     },
   ];
   return (
@@ -323,43 +274,96 @@ function HowItWorks() {
         </h2>
       </div>
 
-      <div className="mt-16 flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-4">
+      <div className="mt-14 flex flex-col gap-4 lg:flex-row lg:items-stretch lg:gap-3">
         {steps.flatMap((s, i) => {
-          const block = (
-            <div key={s.k} className="flex-1">
+          const card = (
+            <div key={s.k} className="flex flex-1 flex-col rounded-2xl border border-line bg-surface p-6">
               <div className="flex items-center gap-3">
-                <span className="grid size-12 shrink-0 place-items-center rounded-xl border border-volt/30 bg-electric/10 shadow-[0_0_28px_-8px_var(--color-electric)]">
-                  <s.Icon className="size-5 text-volt" strokeWidth={1.75} />
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-electric/30 bg-electric/10 text-electric shadow-[0_0_28px_-8px_var(--color-electric)]">
+                  <s.Icon className="size-5" strokeWidth={1.75} />
                 </span>
                 <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-faint">
-                  Step {s.k}
+                  Step {s.k} · {s.label}
                 </span>
               </div>
               <h3 className="mt-5 text-lg font-medium text-ink">{s.t}</h3>
               <p className="mt-2 text-[15px] leading-relaxed text-mute">{s.d}</p>
+              <div className="mt-auto pt-6">{s.visual}</div>
             </div>
           );
-          if (i === steps.length - 1) return [block];
+          if (i === steps.length - 1) return [card];
           return [
-            block,
-            <div key={`beam-${i}`} className="hidden shrink-0 items-center self-start pt-6 lg:flex">
-              <svg width="40" height="8" viewBox="0 0 40 8" aria-hidden>
-                <line x1="0" y1="4" x2="40" y2="4" stroke="var(--color-line)" strokeWidth="1.5" />
-                <line
-                  className="beam-line"
-                  x1="0"
-                  y1="4"
-                  x2="40"
-                  y2="4"
-                  stroke="var(--color-volt)"
-                  strokeWidth="1.5"
-                />
-              </svg>
+            card,
+            <div key={`c-${i}`} className="hidden shrink-0 items-center lg:flex">
+              <ChevronRight className="size-5 text-faint" />
             </div>,
           ];
         })}
       </div>
     </Section>
+  );
+}
+
+const claudeIcon = TOOLS.find((t) => t.name === "Claude")!.icon;
+
+function StepPanel({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-xl border border-line bg-night/50 p-3.5">{children}</div>;
+}
+
+function ImportViz() {
+  const sources = ["Claude & ChatGPT exports", "Claude Code sessions", "git repos"];
+  return (
+    <StepPanel>
+      <p className="font-mono text-[12px] text-mute">
+        <span className="text-electric">$</span> persnally import
+      </p>
+      <ul className="mt-2.5 space-y-1.5 font-mono text-[11px] text-faint">
+        {sources.map((src) => (
+          <li key={src} className="flex items-center gap-2">
+            <Check className="size-3 shrink-0 text-electric" />
+            {src}
+          </li>
+        ))}
+      </ul>
+    </StepPanel>
+  );
+}
+
+function LearnViz() {
+  const signals = ["ships the smallest design", "prefers SQLite", "guards user trust"];
+  return (
+    <StepPanel>
+      <p className="font-mono text-[11px] text-faint">building your model…</p>
+      <ul className="mt-2.5 space-y-1.5 text-[13px] text-mute">
+        {signals.map((sig) => (
+          <li key={sig} className="flex items-center gap-2">
+            <span className="size-1.5 shrink-0 rounded-full bg-electric" />
+            {sig}
+          </li>
+        ))}
+      </ul>
+      <span className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-electric/30 bg-electric/10 px-2 py-0.5 font-mono text-[10px] text-electric">
+        <Cpu className="size-3" />
+        on your machine
+      </span>
+    </StepPanel>
+  );
+}
+
+function ServeViz() {
+  return (
+    <StepPanel>
+      <span className="flex items-center gap-2 text-[13px] text-ink">
+        <Glyph icon={claudeIcon} className="size-3.5 text-ink" />
+        Claude · session started
+      </span>
+      <div className="mt-3 rounded-lg border border-line bg-surface/60 px-3 py-2.5">
+        <p className="font-mono text-[11px] text-electric">↳ loaded your context</p>
+        <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] text-faint">
+          get_context <Check className="size-3 text-electric" /> 12ms
+        </p>
+      </div>
+    </StepPanel>
   );
 }
 
@@ -370,22 +374,22 @@ function Trust() {
     {
       t: "Local-first",
       d: "Your context lives in ~/.persnally on your machine — not our cloud, not any vendor's silo. Serving it to an AI is a local read: instant, offline, free.",
-      viz: <LocalViz />,
-    },
-    {
-      t: "Provenance-complete",
-      d: "Every claim links to the exact events behind it. “Why does it think this?” is a real lookup, never a guess.",
-      viz: <ProvenanceViz />,
+      viz: <LocalProof />,
     },
     {
       t: "Truly deletable",
       d: "Forget a topic and it erases the events and everything derived from them, then rebuilds. No tombstones, no residue.",
-      viz: <DeletableViz />,
+      viz: <DeleteProof />,
+    },
+    {
+      t: "Provenance-complete",
+      d: "Every claim links to the exact events behind it. “Why does it think this?” is a real lookup, never a guess.",
+      viz: <AuditProof />,
     },
     {
       t: "Source-available",
       d: "Read the engine, audit the claims, run it yourself. The event schema and MCP interface are an open spec.",
-      viz: <SourceViz />,
+      viz: <SourceProof />,
     },
   ];
   return (
@@ -396,23 +400,137 @@ function Trust() {
           A context engine you can actually trust.
         </h2>
         <p className="mt-6 text-lg leading-relaxed text-mute">
-          Trust isn&apos;t a privacy policy here — it&apos;s the architecture. These aren&apos;t
-          promises; they&apos;re properties of how it&apos;s built.
+          Trust isn&apos;t a privacy policy here — it&apos;s the architecture. Not promises;
+          properties you can check.
         </p>
       </div>
 
       <div className="mt-14 grid gap-5 md:grid-cols-2">
         {pillars.map((p) => (
-          <SpotlightCard key={p.t}>
-            <div className="border-b border-line/60 bg-night/30 px-6 pb-2 pt-6">{p.viz}</div>
-            <div className="p-6">
-              <h3 className="text-lg font-medium text-ink">{p.t}</h3>
-              <p className="mt-2 text-[15px] leading-relaxed text-mute">{p.d}</p>
-            </div>
+          <SpotlightCard key={p.t} className="p-6">
+            <h3 className="text-lg font-medium text-ink">{p.t}</h3>
+            <p className="mt-2 text-[15px] leading-relaxed text-mute">{p.d}</p>
+            <div className="mt-5">{p.viz}</div>
           </SpotlightCard>
         ))}
       </div>
+
+      <div className="mt-6 flex flex-col items-center gap-6 rounded-2xl border border-line bg-surface/50 p-8 text-center">
+        <div className="flex flex-wrap justify-center gap-2.5">
+          {["No account", "Bring your own keys", "Works offline", "Open spec"].map((c) => (
+            <span
+              key={c}
+              className="inline-flex items-center gap-1.5 rounded-full border border-line bg-night/40 px-3 py-1 font-mono text-[11px] text-mute"
+            >
+              <Check className="size-3 text-electric" />
+              {c}
+            </span>
+          ))}
+        </div>
+        <a
+          href={GITHUB}
+          {...EXT}
+          className="group inline-flex items-center gap-1.5 text-sm text-mute transition-colors hover:text-ink"
+        >
+          <GithubIcon className="size-3.5" />
+          Read the source
+          <ArrowUpRight className="size-3 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+        </a>
+      </div>
     </Section>
+  );
+}
+
+function ProofPanel({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-xl border border-line bg-night/50 p-3.5">{children}</div>;
+}
+
+function LocalProof() {
+  const files = [
+    { icon: <Database className="size-3.5" />, name: "events.db" },
+    { icon: <FileJson className="size-3.5" />, name: "profile.json" },
+    { icon: <FileJson className="size-3.5" />, name: "interests.json" },
+  ];
+  return (
+    <ProofPanel>
+      <p className="font-mono text-[11px] text-faint">~/.persnally</p>
+      <ul className="mt-2.5 space-y-1.5 font-mono text-[12px] text-mute">
+        {files.map((f) => (
+          <li key={f.name} className="flex items-center gap-2">
+            <span className="text-electric">{f.icon}</span>
+            {f.name}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 font-mono text-[10px] text-faint">nothing leaves your laptop</p>
+    </ProofPanel>
+  );
+}
+
+function DeleteProof() {
+  return (
+    <ProofPanel>
+      <p className="font-mono text-[12px] text-mute">
+        <span className="text-electric">$</span> persnally forget “rust”
+      </p>
+      <ul className="mt-2.5 space-y-1.5 font-mono text-[11px] text-faint">
+        <li className="flex items-center gap-2">
+          <Check className="size-3 shrink-0 text-electric" />
+          18 events erased
+        </li>
+        <li className="flex items-center gap-2">
+          <Check className="size-3 shrink-0 text-electric" />
+          derived views rebuilt
+        </li>
+      </ul>
+      <p className="mt-2.5 font-mono text-[10px] text-faint">no tombstones · no residue</p>
+    </ProofPanel>
+  );
+}
+
+function AuditProof() {
+  const events = [
+    { id: "#412", t: "vetoed telemetry" },
+    { id: "#087", t: "chose local-first" },
+    { id: "#203", t: "removed analytics" },
+  ];
+  return (
+    <ProofPanel>
+      <p className="font-mono text-[11px] text-electric">↳ why “guards user trust”?</p>
+      <ul className="mt-2.5 space-y-1.5 font-mono text-[11px] text-mute">
+        {events.map((e) => (
+          <li key={e.id} className="flex items-center gap-2">
+            <span className="text-faint">{e.id}</span>
+            {e.t}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2.5 font-mono text-[10px] text-faint">3 events · 0 guesses</p>
+    </ProofPanel>
+  );
+}
+
+function SourceProof() {
+  return (
+    <a
+      href={GITHUB}
+      {...EXT}
+      className="group block rounded-xl border border-line bg-night/50 p-3.5 transition-colors hover:border-electric/40"
+    >
+      <div className="flex items-center gap-2 text-ink">
+        <GithubIcon className="size-4" />
+        <span className="font-mono text-[12px]">sidpan2011/persnally</span>
+        <ArrowUpRight className="ml-auto size-3.5 text-faint transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      </div>
+      <div className="mt-2.5 flex items-center gap-3 font-mono text-[10px] text-faint">
+        <span className="flex items-center gap-1">
+          <Star className="size-3" />
+          star
+        </span>
+        <span>FSL → MIT after 2y</span>
+        <span>open spec</span>
+      </div>
+    </a>
   );
 }
 
@@ -463,13 +581,13 @@ function Positioning() {
             </ul>
           </div>
 
-          <div className="border-glow rounded-2xl border border-volt/30 bg-gradient-to-b from-electric/[0.07] to-surface p-7">
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-volt">Persnally</p>
+          <div className="border-glow rounded-2xl border border-electric/30 bg-gradient-to-b from-electric/[0.07] to-surface p-7">
+            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-electric">Persnally</p>
             <p className="mt-1.5 text-sm text-mute">the context engine for you</p>
             <ul className="mt-6 space-y-3.5">
               {us.map((x) => (
                 <li key={x} className="flex items-start gap-3 text-[15px] text-ink">
-                  <Check className="mt-0.5 size-4 shrink-0 text-volt" strokeWidth={2.25} />
+                  <Check className="mt-0.5 size-4 shrink-0 text-electric" strokeWidth={2.25} />
                   {x}
                 </li>
               ))}
@@ -486,7 +604,7 @@ function Positioning() {
         <div className="mt-8 flex justify-center">
           <a
             href="#start"
-            className="rounded-lg bg-electric px-5 py-2.5 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-volt"
+            className="rounded-lg bg-electric px-5 py-2.5 text-sm font-medium text-white shadow-[0_0_28px_-6px_var(--color-electric)] transition-colors hover:bg-electric-deep"
           >
             Make every AI yours
           </a>
@@ -500,8 +618,9 @@ function Positioning() {
 
 function GetStarted() {
   return (
-    <Section id="start" className="py-28">
-      <div className="mx-auto max-w-2xl text-center">
+    <Section id="start" className="relative overflow-hidden py-28">
+      <div className="pointer-events-none absolute left-1/2 top-8 h-[420px] w-[680px] max-w-full -translate-x-1/2 rounded-full bg-electric/10 blur-[130px]" />
+      <div className="relative mx-auto max-w-2xl text-center">
         <Eyebrow>Five minutes to your mirror</Eyebrow>
         <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-tight sm:text-5xl">
           Install, and see yourself.
@@ -512,32 +631,22 @@ function GetStarted() {
         </p>
       </div>
 
-      <div className="mx-auto mt-10 max-w-2xl">
+      <div className="relative mx-auto mt-10 max-w-2xl">
         <SetupTabs />
         <p className="mt-5 text-center font-mono text-[12px] text-faint">
           macOS · Linux · Windows · Node 20+ · bring your own key, or run fully local with Ollama
         </p>
-      </div>
-
-      <div className="mx-auto mt-8 flex max-w-2xl flex-wrap items-center justify-center gap-3">
-        <a
-          href={GITHUB}
-          {...EXT}
-          className="group flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 text-sm text-ink transition-colors hover:border-mute"
-        >
-          <GithubIcon className="size-4" />
-          Read the source
-          <ArrowUpRight className={arrowCls} />
-        </a>
-        <a
-          href={NPM}
-          {...EXT}
-          className="group flex items-center gap-2 rounded-lg border border-line bg-surface px-5 py-2.5 text-sm text-ink transition-colors hover:border-mute"
-        >
-          <NpmIcon className="size-4" />
-          persnally on npm
-          <ArrowUpRight className={arrowCls} />
-        </a>
+        <div className="mt-6 flex justify-center">
+          <a
+            href={GITHUB}
+            {...EXT}
+            className="group inline-flex items-center gap-1.5 text-sm text-mute transition-colors hover:text-ink"
+          >
+            <GithubIcon className="size-4" />
+            Read the source
+            <ArrowUpRight className={arrowCls} />
+          </a>
+        </div>
       </div>
     </Section>
   );

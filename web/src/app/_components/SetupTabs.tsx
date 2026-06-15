@@ -66,14 +66,14 @@ export function SetupTabs() {
         <button
           onClick={copy}
           aria-label="Copy"
-          className="absolute right-3 top-3 z-10 rounded-md border border-line bg-night/60 px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-faint transition-colors hover:border-volt/50 hover:text-volt"
+          className="absolute right-3 top-3 z-10 rounded-md border border-line bg-night/60 px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-faint transition-colors hover:border-electric/50 hover:text-electric"
         >
           {copied ? "copied" : "copy"}
         </button>
 
         {tab === "terminal" ? (
           <div className="flex items-center gap-3 px-4 py-3 pr-16">
-            <span className="select-none text-volt" aria-hidden>
+            <span className="select-none text-electric" aria-hidden>
               $
             </span>
             <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[12px] text-ink sm:text-[13.5px] [scrollbar-width:none]">

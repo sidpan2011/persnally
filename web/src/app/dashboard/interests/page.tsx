@@ -27,13 +27,13 @@ interface InterestData {
 
 const CATEGORY_COLORS: Record<string, string> = {
   technology: "bg-electric",
-  business: "bg-volt",
+  business: "bg-electric",
   finance: "bg-electric",
-  career: "bg-volt",
+  career: "bg-electric",
   health: "bg-electric",
-  science: "bg-volt",
+  science: "bg-electric",
   creative: "bg-electric",
-  education: "bg-volt",
+  education: "bg-electric",
   lifestyle: "bg-electric",
   news: "bg-faint",
   other: "bg-line",
@@ -109,7 +109,7 @@ export default function InterestGraphPage() {
   return (
     <div className="space-y-6 bg-night text-ink">
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt">Interest Graph</p>
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric">Interest Graph</p>
         <h1 className="text-2xl text-ink font-semibold tracking-tight mt-1">Interest Graph</h1>
         <p className="text-sm text-mute mt-1">
           {topics.length} topics &middot; {data.interest_graph.total_signals} signals
@@ -147,8 +147,8 @@ export default function InterestGraphPage() {
                 onClick={() => setFilterCategory(filterCategory === cat ? "all" : cat)}
                 className={`flex items-center gap-1.5 font-mono text-[12px] px-2.5 py-1 rounded-md border transition-colors ${
                   filterCategory === cat
-                    ? "border-volt/40 bg-electric/15 text-volt"
-                    : "border-line bg-panel text-mute hover:border-volt/30"
+                    ? "border-electric/40 bg-electric/15 text-electric"
+                    : "border-line bg-panel text-mute hover:border-electric/30"
                 }`}
               >
                 <div className={`w-2 h-2 rounded-full ${CATEGORY_COLORS[cat] || "bg-line"}`} />
@@ -172,7 +172,7 @@ export default function InterestGraphPage() {
             {filterCategory !== "all" && (
               <button
                 onClick={() => setFilterCategory("all")}
-                className="text-xs text-mute hover:text-volt transition-colors"
+                className="text-xs text-mute hover:text-electric transition-colors"
               >
                 Show all
               </button>
@@ -194,7 +194,7 @@ export default function InterestGraphPage() {
                     </div>
                     <div className="h-1.5 bg-line rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-electric to-volt"
+                        className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-electric to-electric"
                         style={{ width: `${Math.min(100, (topic.weight / maxWeight) * 100)}%` }}
                       />
                     </div>
@@ -230,7 +230,7 @@ export default function InterestGraphPage() {
                 return (
                   <span
                     key={entity}
-                    className="rounded-md border border-line bg-panel px-2.5 py-1 font-mono text-mute transition-colors hover:border-volt/30 hover:text-volt"
+                    className="rounded-md border border-line bg-panel px-2.5 py-1 font-mono text-mute transition-colors hover:border-electric/30 hover:text-electric"
                     style={{ fontSize: `${size}rem` }}
                   >
                     {entity}
@@ -241,14 +241,14 @@ export default function InterestGraphPage() {
           </div>
 
           {/* Privacy Note */}
-          <div className="rounded-2xl border border-volt/30 bg-panel p-5">
+          <div className="rounded-2xl border border-electric/30 bg-panel p-5">
             <h3 className="text-sm font-medium text-ink mb-2">Your data, your control</h3>
             <p className="text-xs text-mute leading-relaxed">
               This graph is built from structured signals only — topic names, weights,
               and categories. Your raw conversations are never stored or transmitted.
             </p>
             <p className="text-xs text-faint mt-2">
-              Use <code className="font-mono bg-night border border-line text-volt px-1 rounded">persnally_forget</code> in
+              Use <code className="font-mono bg-night border border-line text-electric px-1 rounded">persnally_forget</code> in
               Claude to remove any topic.
             </p>
           </div>

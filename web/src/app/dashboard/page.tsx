@@ -82,9 +82,9 @@ export default function DashboardOverview() {
   if (!hasData) {
     return (
       <div className="max-w-lg mx-auto text-center py-20">
-        <div className="w-16 h-16 bg-panel border border-volt/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <div className="w-16 h-16 bg-panel border border-electric/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
           <svg
-            className="w-8 h-8 text-volt"
+            className="w-8 h-8 text-electric"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -106,7 +106,7 @@ export default function DashboardOverview() {
           about.
         </p>
         <div className="bg-panel border border-line rounded-lg p-4 text-left font-mono text-sm text-ink mb-4">
-          <span className="text-volt">$</span> npm install -g persnally
+          <span className="text-electric">$</span> npm install -g persnally
         </div>
         <p className="text-xs text-faint">
           Then add it to your Claude Desktop config and start chatting.
@@ -118,7 +118,7 @@ export default function DashboardOverview() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-volt mb-2">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-electric mb-2">
           Overview
         </p>
         <h1 className="text-2xl text-ink font-semibold tracking-tight">Your Interest Pulse</h1>
@@ -168,7 +168,7 @@ export default function DashboardOverview() {
                   </div>
                   <div className="h-2 bg-line rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-electric to-volt rounded-full transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-electric to-electric rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, (topic.weight / maxWeight) * 100)}%` }}
                     />
                   </div>
@@ -206,7 +206,7 @@ export default function DashboardOverview() {
                   .map(([intent, count]) => (
                     <div key={intent} className="flex items-center justify-between">
                       <span className="text-sm text-mute capitalize">{intent}</span>
-                      <span className="text-xs font-mono bg-panel border border-line rounded-full px-2 py-0.5 text-volt">{count}</span>
+                      <span className="text-xs font-mono bg-panel border border-line rounded-full px-2 py-0.5 text-electric">{count}</span>
                     </div>
                   ))}
             </div>
@@ -218,9 +218,9 @@ export default function DashboardOverview() {
               <h2 className="text-ink font-semibold tracking-tight mb-4">Sentiment</h2>
               <div className="flex gap-2">
                 {stats.sentiment.positive > 0 && (
-                  <div className="bg-electric/20 border border-volt/30 rounded-lg px-3 py-2 text-center" style={{ flex: stats.sentiment.positive }}>
-                    <div className="text-lg font-semibold text-volt">{stats.sentiment.positive}</div>
-                    <div className="font-mono text-[11px] uppercase tracking-wider text-volt">positive</div>
+                  <div className="bg-electric/20 border border-electric/30 rounded-lg px-3 py-2 text-center" style={{ flex: stats.sentiment.positive }}>
+                    <div className="text-lg font-semibold text-electric">{stats.sentiment.positive}</div>
+                    <div className="font-mono text-[11px] uppercase tracking-wider text-electric">positive</div>
                   </div>
                 )}
                 {stats.sentiment.neutral > 0 && (
