@@ -101,7 +101,7 @@ export function HeroHub() {
                     />
                   </div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line/60">
-                    <div className="h-full rounded-full bg-electric" style={{ width: `${Math.max(t.w * 100, 6)}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-electric to-[#6f9bff]" style={{ width: `${Math.max(t.w * 100, 6)}%` }} />
                   </div>
                 </li>
               ))}

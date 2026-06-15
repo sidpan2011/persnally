@@ -17,12 +17,30 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://persnally.com"),
   title: "Persnally — the context engine for you",
   description,
+  applicationName: "Persnally",
   keywords: ["personal context engine", "local-first", "MCP", "AI memory", "Claude", "ChatGPT", "Cursor"],
+  authors: [{ name: "Persnally", url: "https://persnally.com" }],
+  creator: "Persnally",
+  publisher: "Persnally",
+  category: "technology",
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   openGraph: {
     title: "Persnally — so every AI finally knows you",
     description,
     url: "https://persnally.com",
     siteName: "Persnally",
+    locale: "en_US",
     type: "website",
   },
   twitter: {
@@ -32,10 +50,24 @@ export const metadata: Metadata = {
   },
 };
 
+// Structured data for rich results (SoftwareApplication: free, BYOK, source-available).
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Persnally",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "macOS, Linux, Windows",
+  description,
+  url: "https://persnally.com",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  license: "https://github.com/sidpan2011/persnally/blob/main/LICENSE",
+};
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`dark ${sans.variable} ${mono.variable}`}>
       <body className="antialiased">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         {OPENPANEL_CLIENT_ID && (
           <OpenPanelComponent
             clientId={OPENPANEL_CLIENT_ID}
