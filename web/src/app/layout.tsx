@@ -15,7 +15,7 @@ const description =
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://persnally.com"),
-  title: "Persnally — the context engine for you",
+  title: "Persnally — your own context engine",
   description,
   applicationName: "Persnally",
   keywords: ["personal context engine", "local-first", "MCP", "AI memory", "Claude", "ChatGPT", "Cursor"],
