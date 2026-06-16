@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Persnally — the context engine for you";
+export const alt = "Persnally — your own context engine";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -33,7 +33,7 @@ export default function OpengraphImage() {
             marginBottom: 30,
           }}
         >
-          The context engine for you
+          Your own context engine
         </div>
         <div style={{ display: "flex", fontSize: 116, fontWeight: 800, letterSpacing: "-0.04em" }}>
           <span>persnally</span>
