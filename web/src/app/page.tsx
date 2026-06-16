@@ -123,7 +123,7 @@ function Hero() {
         <div className="rise" style={{ animationDelay: "0ms" }}>
           <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1 font-mono text-[11px] text-mute backdrop-blur">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-electric" />
-            The context engine for you
+            Your own context engine
           </span>
         </div>
 
@@ -141,7 +141,7 @@ function Hero() {
         >
           Persnally learns who you are from your AI history — your chats, your code, your decisions —
           and feeds it to every tool you use, so you stop re-explaining your stack, your conventions,
-          and yourself to every new AI.
+          and yourself to every new AI. It lives on your machine, and it&apos;s yours.
         </p>
 
         <div
@@ -253,7 +253,7 @@ function HowItWorks() {
       label: "Learn · local",
       Icon: Cpu,
       t: "It learns, on your machine",
-      d: "A local daemon turns that activity into a structured, evidence-linked model of who you are. Nothing leaves your laptop.",
+      d: "A local daemon turns that activity into a structured, evidence-linked model of who you are — kept on your machine, never our cloud.",
       visual: <LearnViz />,
     },
     {
@@ -462,7 +462,7 @@ function LocalProof() {
           </li>
         ))}
       </ul>
-      <p className="mt-3 font-mono text-[10px] text-faint">nothing leaves your laptop</p>
+      <p className="mt-3 font-mono text-[10px] text-faint">stays on your machine, never our cloud</p>
     </ProofPanel>
   );
 }
@@ -538,16 +538,16 @@ function SourceProof() {
 
 function Positioning() {
   const them = [
-    "Built for agents & apps, not people",
-    "Lives in their cloud",
-    "Locked to one vendor",
-    "You can't see, audit, or delete it",
+    "Your context lives in their cloud",
+    "They own what it knows about you",
+    "Locked to one app — every other AI starts over",
+    "A black box — it can't tell you why",
   ];
   const us = [
-    "Built for you",
-    "Local-first, on your machine",
-    "Across every AI vendor",
-    "Read it, audit it, delete it — for real",
+    "Knows you across every AI you use",
+    "Yours — you own it outright, no vendor holds it",
+    "Every claim cites its evidence — ask it why",
+    "See it, audit it, delete it — for real",
   ];
   return (
     <Section className="py-28">
@@ -559,9 +559,9 @@ function Positioning() {
         <div className="text-center">
           <Eyebrow>The difference</Eyebrow>
           <p className="mx-auto mt-6 max-w-3xl text-balance text-[1.9rem] font-semibold leading-tight tracking-tight sm:text-[2.9rem] sm:leading-[1.1]">
-            They built context <span className="text-mute">for agents.</span>
-            <br className="hidden sm:block" /> We built it{" "}
-            <span className="text-gradient">for you.</span>
+            Every AI knows <span className="text-mute">you.</span>
+            <br className="hidden sm:block" /> And it&apos;s{" "}
+            <span className="text-gradient">yours.</span>
           </p>
         </div>
 
@@ -570,7 +570,7 @@ function Positioning() {
             <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-faint">
               Every other memory tool
             </p>
-            <p className="mt-1.5 text-sm italic text-faint">“the memory layer for AI agents”</p>
+            <p className="mt-1.5 text-sm italic text-faint">“memory that lives in someone’s cloud”</p>
             <ul className="mt-6 space-y-3.5">
               {them.map((x) => (
                 <li key={x} className="flex items-start gap-3 text-[15px] text-mute">
@@ -583,7 +583,7 @@ function Positioning() {
 
           <div className="border-glow rounded-2xl border border-electric/30 bg-gradient-to-b from-electric/[0.07] to-surface p-7">
             <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-electric">Persnally</p>
-            <p className="mt-1.5 text-sm text-mute">the context engine for you</p>
+            <p className="mt-1.5 text-sm text-mute">your own context engine</p>
             <ul className="mt-6 space-y-3.5">
               {us.map((x) => (
                 <li key={x} className="flex items-start gap-3 text-[15px] text-ink">
@@ -596,9 +596,9 @@ function Positioning() {
         </div>
 
         <p className="mx-auto mt-10 max-w-xl text-center text-sm leading-relaxed text-faint">
-          Every memory startup&apos;s homepage says &ldquo;for agents.&rdquo; Ours is the one that
-          says <span className="text-mute">for you</span> — local-first, across every model, owned
-          by you.
+          Every memory tool now promises your context is &ldquo;yours.&rdquo; Persnally is the one
+          where that&apos;s true — it knows you everywhere, you own it outright, and you can see and
+          delete everything it knows.
         </p>
 
         <div className="mt-8 flex justify-center">
