@@ -91,7 +91,7 @@ Both commands must come back empty. This is the leak gate.
 ```bash
 cd "$OUT"
 git init -q && git add -A
-git commit -q -m "Persnally — the context engine for you. Local-first, across every AI."
+git commit -q -m "Persnally — your own context engine. Local-first, across every AI."
 
 # Free the canonical name (GitHub keeps a redirect from the old URL)
 gh repo rename persnally-internal -R sidpan2011/persnally          # private repo
@@ -99,7 +99,7 @@ git -C "$SRC" remote set-url origin github-personal:sidpan2011/persnally-interna
 
 # Create the public-name repo as PRIVATE first, push, verify before exposing
 gh repo create sidpan2011/persnally --private --source="$OUT" --remote=origin --push \
-  --description "The context engine for you — local-first, across every AI. So every AI finally knows you."
+  --description "Your own context engine — local-first, across every AI. So every AI finally knows you."
 ```
 
 ## Phase 4 — verify before flipping public

@@ -1,6 +1,6 @@
 # Persnally — Project Guide (v2)
 
-> **Full strategy lives in [PIVOT.md](./PIVOT.md). Status lives in [PROGRESS.md](./PROGRESS.md) — update it on every meaningful step. This file is the always-loaded summary — keep it short.**
+> **Locked vision lives in [docs/VISION.md](./docs/VISION.md) — the fixed reference; don't re-litigate it. Full strategy lives in [PIVOT.md](./PIVOT.md). Status lives in [PROGRESS.md](./PROGRESS.md) — update it on every meaningful step. This file is the always-loaded summary — keep it short.**
 
 ## What we're building (v2)
 
@@ -9,8 +9,8 @@
 **Brand kit** (use the right line for the surface):
 - Pitch (deck/positioning): *The giants build the intelligence. Persnally makes it yours.*
 - Tagline (CLI/site hero/README): *So every AI finally knows you.*
-- Descriptor (npm/GitHub/HN): *The context engine for you — local-first, across every AI.*
-- Competitive contrast: *They built context for agents. We built it for you.* (Mem0 = "memory layer for AI agents", supermemory = "context cloud for agents" — every incumbent says "for agents"; only we say "for you")
+- Descriptor (npm/GitHub/HN): *Your own context engine — local-first, across every AI.*
+- Competitive contrast: *Everyone says your context is "yours." Persnally keeps it on your machine.* (Old "for agents vs for you" line retired — cross-vendor rivals (Plurality, Maximem) now say "for you" too; the real differentiator is **custody**: they hold it in their cloud, we keep it local + auditable + deletable. See [docs/VISION.md](./docs/VISION.md).)
 
 We are **not** competing with Claude/ChatGPT/Cursor. We sit **on top of them** via MCP (their own protocol) as the neutral, user-owned context layer they structurally can't build for each other.
 
