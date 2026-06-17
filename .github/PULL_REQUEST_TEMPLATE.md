@@ -12,7 +12,7 @@ What problem does this solve or what feature does this add?
 
 ## Checklist
 
-- [ ] TypeScript compiles (`cd mcp_server/persnally && npm run build`)
-- [ ] E2E test passes (`npm test`)
+- [ ] TypeScript compiles (`cd persnallyd && npm run build`)
+- [ ] Tests pass (`cd persnallyd && npm test`)
 - [ ] No unrelated changes included
 - [ ] Commit messages describe the "why"
