@@ -87,7 +87,7 @@ descriptive profile.
 ```
 
 ### `signal.skill` — detected technical skill
-From the git/GitHub importer (v1 `skill_analyzer` logic).
+From the git importer (framework→skill detection in `persnallyd/src/importers/git.ts`).
 
 ```jsonc
 { "skill": "fastapi", "domain": "backend", "proficiency": 0.6, "basis": "repo-activity" }
