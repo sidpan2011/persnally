@@ -60,7 +60,7 @@ We're building the best-engineered product in this market. Every change is held 
 - **Phase 3 — The Loop:** one agent-facing decision loop (`ask_user_model`), ≥90% precision gate. Feedback closes itself via approvals/vetoes.
 - **Phase 4 — Business:** hybrid cloud-as-amplifier. Free: full local engine (BYOK). Pro: zero-setup inference (we pay the model bill), agent relay (cloud agents + phones reach your context, E2E), reflection reports, encrypted backup, maintained connectors. Teams later. Licensing: FSL engine (auditable, fork-proof, →MIT after 2y) + open event-schema/MCP spec + closed cloud. Raise on Phase 2 retention or the Phase 3 demo.
 
-**Current phase: 0 (pre-build) — pivoting off the digest product.**
+**Current phase: 1 — The Mirror** (persnallyd built; validating — cold demos + capture-rate verdict — before Phase 2).
 
 ## Codebase map
 

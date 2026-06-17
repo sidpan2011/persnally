@@ -10,7 +10,7 @@ const run = promisify(execFile);
 const home = mkdtempSync(join(tmpdir(), "connect-test-"));
 const CLI = join(import.meta.dirname, "..", "src", "cli.js");
 
-// Hermetic MCP target: CI doesn't build the sibling mcp_server package (build/ is gitignored).
+// Hermetic MCP target: the test must not depend on the MCP server being built (build/ is gitignored).
 const fakeMcp = join(home, "fake-mcp", "index.js");
 mkdirSync(join(home, "fake-mcp"));
 writeFileSync(fakeMcp, "// stub\n");

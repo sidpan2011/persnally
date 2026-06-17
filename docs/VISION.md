@@ -69,6 +69,6 @@ A "pivot" is a change in the **flexible** column. The fixed column is the compan
 ---
 
 _Strategy & phases: [PIVOT.md](../PIVOT.md) · Status: [PROGRESS.md](../PROGRESS.md) ·
-Architecture: [ARCHITECTURE.md](./ARCHITECTURE.md). Competitive positioning needs a
-PIVOT.md refresh — the 2026-06-11 "open seat" framing is falsified (see the mid-2026
-market check)._
+Architecture: [ARCHITECTURE.md](./ARCHITECTURE.md). PIVOT.md carries the refreshed
+competitive framing — the 2026-06-11 "open seat" verdict was falsified by the mid-2026
+market check._
