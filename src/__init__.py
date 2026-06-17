@@ -1,1 +1,0 @@
-# Persnally - Intelligence Engine

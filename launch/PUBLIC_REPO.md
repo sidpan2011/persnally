@@ -31,8 +31,9 @@
 - `PIVOT.md`, `PROGRESS.md`, `CLAUDE.md` — strategy/planning
 - `launch/` — this kit, demo kit, security review
 - `experiments/` — Phase 0 internal scripts
-- `api/`, `web/`, `src/` (Python), `supabase/`, `data_sources/` — the old digest product (not part of the npm package)
-- `nixpacks.toml`, `railway.toml`, `requirements.txt`, `ruff.toml`, `.env.example` — old-product infra
+- `web/` — the marketing site (deployed separately to Vercel; not part of the npm package)
+- `.env.example` — not part of the package
+  <br>*(The v1 Python/Supabase backend — `api/`, `src/`, `supabase/`, `data_sources/`, `nixpacks.toml`, `railway.toml`, `requirements.txt`, `ruff.toml` — was removed entirely on 2026-06-18, so there's nothing left to exclude.)*
 
 Layout choice: keep `persnallyd/` as a subdirectory (don't promote to root). The package already publishes from there; `prepublishOnly` copies `../README.md` + `../LICENSE`, which only works with the package in a subdir. Keeping the layout means **zero changes to the working package** — lowest risk.
 

@@ -62,29 +62,17 @@ We're building the best-engineered product in this market. Every change is held 
 
 **Current phase: 0 (pre-build) — pivoting off the digest product.**
 
-## Codebase map (post-teardown)
+## Codebase map
 
-The old digest product (email/curation/content-sourcing, ~8.9k LOC) was **removed** in the v2 teardown (PR #11). What remains:
+The v1 Python/Supabase backend (FastAPI `api/`, the `src/` analyzers, `supabase/` migrations, Railway deploy) was **removed** — v2 is local-first TypeScript and used none of it; its salvage logic (repo→skill detection) already lives in `persnallyd/src/importers/git.ts`. Git history preserves it; Phase 4 cloud is rebuilt to the E2E doctrine, not revived from here. What's in the tree:
 
-**KEEP & EVOLVE**
-- `persnallyd/` — the v2 product AND the published npm package (`persnally`, bins: `persnally`/`persnallyd`/`persnally-mcp`): event store, decay extractor, importers, profile synthesis, daemon + dashboard, and the thin MCP adapter at `src/mcp/` (no local state; the daemon is the single source of truth). All new work lands here.
-- `src/skill_analyzer.py` + `src/repo_analyzer.py` — GitHub analysis = import-based cold start (Phase 1 importer, ~80% built).
-- `src/topic_utils.py`, `src/cache.py` — generic infra, no upward deps.
-- `api/routers/digest.py` — gutted to interest-graph `/sync` + `/interests` + `/stats` only; rename prefix to `/context` in Phase 1.
-- Supabase auth (`api/middleware/auth_middleware.py`, `api/services/supabase_client.py`, `web/src/lib/supabase/*`) — for Phase 4 sync.
-- `src/behavior_analyzer.py` — salvage the extraction approach for Phase 3 (currently GitHub-only; rewrite I/O).
+- `persnallyd/` — **the product** AND the published npm package (`persnally`, bins: `persnally`/`persnallyd`/`persnally-mcp`): SQLite event store, decay + profile extractors, importers (claude, claude-code, chatgpt, git), daemon + dashboard, and the thin MCP adapter at `src/mcp/` (no local state; the daemon is the single source of truth). All engine work lands here.
+- `web/` — the marketing site (Next.js → Vercel). `web/src/lib/supabase/*` is kept as dormant auth scaffolding for Phase 4 sync; nothing imports it yet.
+- `experiments/` — Phase-0 validation tooling (`capture_rate.py`, `describe_me.py`), standalone, stdlib + ad-hoc deps.
+- `docs/` — [VISION.md](./docs/VISION.md) (locked), [EVENT_SCHEMA.md](./docs/EVENT_SCHEMA.md), [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
 
-**Reference (closed PR branches on remote, not merged):** `feat/cloudflare-real-content`, `feat/digest-feedback-loop`, `feat/github-seed-onboarding` (its repo→topic-category mapping feeds the Phase 1 git importer).
+## Deployment
 
-**Greenfield (does not exist yet)** — the hardest gaps: the `persnallyd` daemon, the CLI, the local dashboard, and the production importers. The event schema is designed: [docs/EVENT_SCHEMA.md](./docs/EVENT_SCHEMA.md) — append-only event log, derived views, provenance graph. All v2 persistence work builds on it.
-
-## Deployment (current, pre-pivot)
-
-- Web (Next.js) → Vercel · API (FastAPI) → Railway (nixpacks, not Dockerfile) · MCP → npm as `persnally`.
+- `persnally` → npm (the product). Marketing site (`web/`) → Vercel.
+- The Railway-hosted FastAPI API was **removed** with the v1 backend; Phase 4 cloud is greenfield, built to the cloud-as-amplifier doctrine.
 - Repo is **private** until the v2 launch. Keep PIVOT.md internal; publish a sanitized `ROADMAP.md` at Phase 1 launch.
-
-## Known issues (from audit — fix or carry-forward into v2)
-
-- Interest decay double-counts frequency (`interest-engine.ts` `raw_weight` grows unbounded + frequency bonus) — fix when porting to the event log.
-- `dominant_intent` takes latest signal, not most-frequent (comment says otherwise).
-- Zero Python tests; only one manual `.mjs` MCP test. v2 needs a real test harness.

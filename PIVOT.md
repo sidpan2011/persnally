@@ -5,6 +5,8 @@
 
 **One-liner:** *The giants build the intelligence. Persnally makes it yours.*
 
+> **Vision is locked in [docs/VISION.md](./docs/VISION.md)** (ownership-framed: "yours" is the promise, local-first is the proof). **Competitive reality — re-checked 2026-06-17:** the "open seat" is contested (Plurality, Maximem, Mem0's OpenMemory ship cross-vendor user-owned context), and Anthropic + Google shipped one-way cross-app memory *import* (Mar 2026). MCP as the distribution rail is validated (Linux Foundation; ~110M monthly SDK downloads). The uncontested wedge is **local-first plaintext custody + source-available auditability + provenance**, fed by Claude Code transcripts + git. Lead there — not on "cross-vendor" or "no one else does this."
+
 ---
 
 ## Strategic Foundation (decided)
@@ -92,7 +94,7 @@ Two deliberate deviations from the raw pipeline:
 
 - Email + digest → **cut entirely**: email sender, templates, Resend MCP submodule, scheduler send loop, and the whole content-sourcing pipeline (`fresh_content_generator`, `content_validator`, `data_sources/`) that existed to fill it. Email may return later as a re-engagement tactic (e.g. monthly "what Persnally learned" note) — a marketing feature, never architecture.
 - Vercel web app → becomes marketing site + docs. Product UI moves to the local dashboard.
-- Railway API → out of the critical path entirely. Parked for Phase 4 (sync).
+- Railway API → **removed** (2026-06-18): the v1 FastAPI/Supabase backend is gone — v2 used none of it, and Phase 4 cloud is greenfield to the E2E doctrine, not revived from it.
 - npm package keeps the `persnally` name — continuity of installs.
 
 ### Launch
@@ -173,7 +175,7 @@ Open-source launch: Show HN + X thread. The hook: **"I imported my ChatGPT histo
 
 | Risk | Mitigation |
 |---|---|
-| Platforms bundle memory features | Neutrality + cross-vendor span + local ownership — structurally unavailable to any single vendor. Track quarterly, answer in deck |
+| Platforms bundle memory features | **Happening:** Anthropic + Google shipped one-way cross-app *import* (Mar 2026) — but into their own cloud, as switcher tools. The neutral, two-way, **local-custody** version stays structurally unavailable to any single vendor. Differentiate on custody + provenance, not "cross-vendor" alone. See [docs/VISION.md](./docs/VISION.md) |
 | Import demo underwhelms | Phase 0 kills this for $0 before any real build |
 | Tool-approval friction breaks ambient capture | Phase 2's read-path makes capture part of normal MCP usage; hooks/instruction files as fallback |
 | Misspelled-brand search leakage | Own adjacent domains/spellings; dev audience meets the brand in written form (npm/GitHub/configs) |
