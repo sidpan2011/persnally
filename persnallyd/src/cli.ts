@@ -25,6 +25,7 @@ import {
   autostartInstalled, installAutostart, LOG_FILE, removeAutostart,
   removePidFile, runningPid, startDetached, stopDaemon, writePidFile,
 } from "./lifecycle.js";
+import { newEvent } from "./events.js";
 import { renderProfile, synthesizeProfile } from "./profile.js";
 import { DEFAULT_DB_PATH, EventStore } from "./store.js";
 
@@ -43,6 +44,7 @@ Usage:
   persnallyd profile                Synthesize your profile from the store
   persnallyd consolidate            Reflect now: refresh decay, add behavior patterns, re-synthesize
   persnallyd show [topics|events|profile]   Show topics (default), recent events, or the profile
+  persnallyd context [--full]       Emit profile + interests for AI injection (records a context read)
   persnallyd forget <topic>         Hard-delete a topic and everything derived from it
   persnallyd forget --all           Delete all data
   persnallyd forget --batch <id>    Undo one import batch
@@ -300,6 +302,45 @@ async function main(): Promise<void> {
         }
       }
       store.close();
+      return;
+    }
+    case "context": {
+      // Serving path for the SessionStart hook: emit profile + interests for
+      // injection AND record the read, so hook injections count toward the
+      // context-reads metric exactly like the MCP persnally_context tool. `show`
+      // stays side-effect-free so manual inspection never inflates the metric.
+      const full = args.includes("--full");
+      const store = new EventStore();
+      const profile = store.getProfile();
+      const topics = store.topics(full ? 25 : 12);
+      if (!profile && !topics.length) { store.close(); return; }
+      const out: string[] = [];
+      let items = topics.length;
+      if (profile) {
+        out.push("# About the user", profile.headline, "");
+        const sections = full ? profile.sections : profile.sections.slice(0, 3);
+        items += sections.length;
+        for (const s of sections) out.push(`## ${s.title}`, s.body, "");
+      }
+      if (topics.length) {
+        out.push("# Current interests (decay-weighted)");
+        for (const t of topics) {
+          out.push(`- ${t.topic} (${t.category}, ${t.dominant_intent}, weight ${t.weight.toFixed(2)})`);
+        }
+      }
+      // Recording must never break the injection itself (mirrors MCP recordRead).
+      try {
+        store.append([newEvent(
+          "context.read",
+          "cli",
+          { scope: full ? "full" : "brief", client_purpose: "session-start hook", items },
+          { kind: "local", surface: "cli" },
+        )]);
+      } catch (e) {
+        console.error("persnally: context.read not recorded:", e instanceof Error ? e.message : e);
+      }
+      store.close();
+      console.log(out.join("\n"));
       return;
     }
     case "forget": {
