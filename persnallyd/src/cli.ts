@@ -9,7 +9,7 @@ import { existsSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { applyApiKey, configPath, loadConfig, saveConfig } from "./config.js";
-import { CLIENTS, connectAll, connectClient, type Client } from "./connect.js";
+import { CLIENTS, connectAll, connectClient, installClaudeCodeHook, type Client } from "./connect.js";
 import { runConsolidation } from "./consolidate.js";
 import { chooseExtractor } from "./llm.js";
 import { CATEGORIES, clearScope, loadScopes, setScope, type Category } from "./permissions.js";
@@ -166,8 +166,13 @@ async function main(): Promise<void> {
       store.close();
 
       // 6. AI clients
-      for (const { client, file } of connectAll()) {
+      const connections = connectAll();
+      for (const { client, file } of connections) {
         console.log(file ? `✓ Connected ${client}` : `· ${client} not installed — skipped`);
+      }
+      if (connections.some((r) => r.client === "claude-code" && r.file)) {
+        try { installClaudeCodeHook(); console.log("✓ Context hook installed (injects on every Claude Code session)"); }
+        catch (e) { console.error(`· Context hook skipped: ${e instanceof Error ? e.message : e}`); }
       }
 
       console.log(`\nDone${imported ? ` — ${imported} events imported` : ""}. Dashboard: http://127.0.0.1:${port}`);
@@ -203,6 +208,14 @@ async function main(): Promise<void> {
       const results = target ? [{ client: target, file: connectClient(target) }] : connectAll();
       for (const { client, file } of results) {
         console.log(file ? `Connected ${client} (${file})` : `${client} not installed — skipped`);
+      }
+      // Claude Code also gets a SessionStart hook so every session injects context automatically.
+      if (results.some((r) => r.client === "claude-code" && r.file)) {
+        try {
+          console.log(`Installed Claude Code context hook (${installClaudeCodeHook()})`);
+        } catch (e) {
+          console.error(`Context hook not installed: ${e instanceof Error ? e.message : e}`);
+        }
       }
       return;
     }
@@ -310,6 +323,7 @@ async function main(): Promise<void> {
       // context-reads metric exactly like the MCP persnally_context tool. `show`
       // stays side-effect-free so manual inspection never inflates the metric.
       const full = args.includes("--full");
+      const hook = args.includes("--hook");
       const store = new EventStore();
       const profile = store.getProfile();
       const topics = store.topics(full ? 25 : 12);
@@ -333,14 +347,18 @@ async function main(): Promise<void> {
         store.append([newEvent(
           "context.read",
           "cli",
-          { scope: full ? "full" : "brief", client_purpose: "session-start hook", items },
+          { scope: full ? "full" : "brief", client_purpose: hook ? "session-start hook" : "cli context read", items },
           { kind: "local", surface: "cli" },
         )]);
       } catch (e) {
         console.error("persnally: context.read not recorded:", e instanceof Error ? e.message : e);
       }
       store.close();
-      console.log(out.join("\n"));
+      const rendered = out.join("\n");
+      // --hook emits the SessionStart envelope itself, so the installed hook needs no jq.
+      console.log(hook
+        ? JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: rendered } })
+        : rendered);
       return;
     }
     case "forget": {
