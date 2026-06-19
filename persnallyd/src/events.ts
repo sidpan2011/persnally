@@ -37,6 +37,16 @@ export const PAYLOAD_SCHEMAS = {
     proficiency: z.number().min(0).max(1),
     basis: z.string(),
   }),
+  // How the user writes/works — the prescriptive layer (docs/CONTEXT_DEPTH.md).
+  // Structured so it dedupes by `pattern` and consolidates into stable constants.
+  "signal.style": z.object({
+    dimension: z.enum(["voice", "convention", "emphasis", "format", "workflow"]),
+    pattern: z.string().min(1),
+    polarity: z.enum(["does", "avoids", "prefers", "insists"]),
+    confidence: z.number().min(0).max(1),
+    evidence: z.string(),
+    basis: z.enum(["observed", "stylometry", "correction"]),
+  }),
   "context.read": z.object({
     scope: z.string(),
     client_purpose: z.string(),

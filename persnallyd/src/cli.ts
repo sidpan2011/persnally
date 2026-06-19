@@ -26,6 +26,8 @@ import {
   removePidFile, runningPid, startDetached, stopDaemon, writePidFile,
 } from "./lifecycle.js";
 import { newEvent } from "./events.js";
+import { proseLines } from "./prose.js";
+import { analyzeVoice } from "./stylometry.js";
 import { renderProfile, synthesizeProfile } from "./profile.js";
 import { DEFAULT_DB_PATH, EventStore } from "./store.js";
 
@@ -42,6 +44,7 @@ Usage:
   persnallyd import chatgpt <path>  Import a ChatGPT export dir or conversations.json (needs ANTHROPIC_API_KEY)
   persnallyd import git <path> [--author <email>]   Import repo activity (offline, no LLM); path = repo or folder of repos
   persnallyd profile                Synthesize your profile from the store
+  persnallyd voice                  Refresh your voice fingerprint from Claude Code transcripts (offline, no LLM)
   persnallyd consolidate            Reflect now: refresh decay, add behavior patterns, re-synthesize
   persnallyd show [topics|events|profile]   Show topics (default), recent events, or the profile
   persnallyd context [--full]       Emit profile + interests for AI injection (records a context read)
@@ -296,6 +299,20 @@ async function main(): Promise<void> {
       const profile = await synthesizeProfile(store, engine.extract, engine.model);
       store.close();
       console.log(renderProfile(profile));
+      return;
+    }
+    case "voice": {
+      // Deterministic, offline, re-runnable — refreshes the stylometry layer in place.
+      const dir = args[0] || DEFAULT_TRANSCRIPTS_DIR;
+      const { parsed } = parseClaudeCodeTranscripts(dir);
+      const corpus = parsed.conversations.flatMap((c) => proseLines(c.userMessages.join("\n")));
+      const v = analyzeVoice(corpus);
+      if (!v.signals.length) return die(`Not enough prose in ${dir} to fingerprint a voice yet.`);
+      const store = new EventStore();
+      store.clearStyleByBasis("stylometry"); // replace, don't accumulate, across re-runs
+      store.append(v.signals.map((s) => newEvent("signal.style", "cli", s, { kind: "local", surface: "cli" })));
+      store.close();
+      console.log(`Voice fingerprint refreshed from ${v.prompts} prompts.\n\n${v.pack}`);
       return;
     }
     case "show": {
