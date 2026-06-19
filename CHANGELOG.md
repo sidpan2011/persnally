@@ -2,6 +2,17 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.1.0] - 2026-06-20
+
+### Added
+- `persnally context [--full|--hook]` — emits your profile + interests for AI injection and records a context read (the serving path for the SessionStart hook).
+- Auto-install of a Claude Code SessionStart hook on `connect` / `setup`, so every session injects your context automatically. Idempotent; leaves other tools' hooks untouched.
+
+### Fixed
+- Atomic config writes (temp file + rename) when registering MCP clients and installing the Claude Code hook — a crash mid-write can no longer corrupt a user's config.
+
+> 2.0.0 (June 2026) was the v2 local-first rewrite — SQLite event store, loopback daemon, importers, embedded dashboard, daemon-backed MCP. The v1 entry below predates it.
+
 ## [1.0.0] - 2026-03-10
 
 ### Added
