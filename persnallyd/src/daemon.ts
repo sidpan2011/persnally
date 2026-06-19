@@ -62,6 +62,10 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
         const profile = store.getProfile();
         return profile ? json(res, 200, profile) : json(res, 404, { error: "no profile synthesized yet" });
       }
+      if (req.method === "GET" && url.pathname === "/voice") {
+        // Stylistic, not topical — served to every client (it's how you write, not what about).
+        return json(res, 200, store.voice());
+      }
       if (req.method === "GET" && url.pathname === "/scopes") {
         return json(res, 200, loadScopes());
       }
