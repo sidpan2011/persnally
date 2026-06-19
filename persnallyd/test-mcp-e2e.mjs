@@ -29,6 +29,7 @@ const mockDaemon = http.createServer((req, res) => {
     if (path === "/profile") return respond(200, { headline: "A builder", sections: [{ title: "Work", body: "Ships fast." }], generated_at: "2026-06-11" });
     if (path === "/topics") return respond(200, [{ topic: "rust", category: "technology", weight: 0.9, signals: 3, dominant_intent: "building", sentiment_balance: 0.5, entities: [] }]);
     if (path === "/stats") return respond(200, { total: 4, first: "2026-01-01", last: "2026-06-11" });
+    if (path === "/voice") return respond(200, { pack: "Write like this user: terse, no filler.", items: [{ dimension: "voice", pattern: "terse, no filler", polarity: "does", confidence: 0.8, evidence: "x", basis: "stylometry" }] });
     respond(404, { error: "not found" });
   });
 });
@@ -92,12 +93,24 @@ console.log("✅ handshake + tool list");
 const trackText = await callTool("persnally_track", {
   topics: [{ topic: "event sourcing", weight: 0.9, intent: "building", sentiment: "positive", depth: "deep", category: "technology", entities: ["SQLite"] }],
 });
-assert.match(trackText, /Recorded 1 signal/);
+assert.match(trackText, /Recorded.*1 topic/);
 const tracked = received.posts.find((p) => Array.isArray(p) && p[0]?.payload?.topic === "event sourcing");
 assert.ok(tracked, "track must POST to the daemon");
 assert.equal(tracked[0].source, "mcp:e2e-test");
 assert.deepEqual(tracked[0].provenance, { kind: "mcp", client: "e2e-test" });
 console.log("✅ track → POST /events with client provenance");
+
+// ── track live style signals → signal.style with basis "observed" (Slice 2) ──
+const styleText = await callTool("persnally_track", {
+  style: [{ dimension: "convention", pattern: "prefers pnpm over npm", polarity: "prefers", confidence: 0.8, evidence: "said so twice" }],
+});
+assert.match(styleText, /1 style signal/);
+const styled = received.posts.find((p) => Array.isArray(p) && p[0]?.type === "signal.style");
+assert.ok(styled, "style capture must POST a signal.style event");
+assert.equal(styled[0].payload.basis, "observed", "live capture marks basis=observed");
+assert.equal(styled[0].payload.pattern, "prefers pnpm over npm");
+assert.deepEqual(styled[0].provenance, { kind: "mcp", client: "e2e-test" });
+console.log("✅ track captures live style signals (basis observed)");
 
 // ── migration fired on initialize ──
 const migrated = received.posts.find((p) => Array.isArray(p) && p[0]?.provenance?.file === "interest-graph.json");
@@ -111,17 +124,18 @@ console.log("✅ v1 graph migrated and renamed");
 const ctx = await callTool("persnally_context", { detail: "brief" });
 assert.match(ctx, /A builder/);
 assert.match(ctx, /rust.*0\.90/);
-console.log("✅ context renders profile + topics");
+assert.match(ctx, /How to write for this user[\s\S]*terse, no filler/, "context injects the voice pack");
+console.log("✅ context renders profile + voice + topics");
 
 // ── context reads are recorded as context.read events (the north-star metric) ──
 const reads = () => received.posts.filter((p) => Array.isArray(p) && p[0]?.type === "context.read");
 assert.equal(reads().length, 1, "context must record a context.read event");
 assert.equal(reads()[0][0].source, "mcp:e2e-test");
 assert.deepEqual(reads()[0][0].provenance, { kind: "mcp", client: "e2e-test" });
-assert.deepEqual(reads()[0][0].payload, { scope: "brief", client_purpose: "", items: 2 });
+assert.deepEqual(reads()[0][0].payload, { scope: "brief", client_purpose: "", items: 3 });
 await callTool("persnally_context", { detail: "full", purpose: "personalize a code review" });
 assert.equal(reads().length, 2);
-assert.deepEqual(reads()[1][0].payload, { scope: "full", client_purpose: "personalize a code review", items: 2 });
+assert.deepEqual(reads()[1][0].payload, { scope: "full", client_purpose: "personalize a code review", items: 3 });
 console.log("✅ context reads recorded with scope, purpose, items");
 
 // ── interests + forget ──

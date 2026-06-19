@@ -569,8 +569,9 @@ $("reflect").onclick = async () => {
 };
 setInterval(async () => {
   if (DEMO) return;
-  const reads = await get("/events?type=context.read&limit=60"), stats = await get("/stats");
+  const [reads, stats, voice] = await Promise.all([get("/events?type=context.read&limit=60"), get("/stats"), get("/voice")]);
   if (reads && stats) renderReads(reads, (stats.byType && stats.byType["context.read"]) || reads.length);
+  if (voice) renderVoice(voice); // live: voice signals captured mid-session show up without a reload
 }, 25000);
 
 loadAll();

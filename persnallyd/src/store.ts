@@ -246,7 +246,9 @@ export class EventStore {
       const key = `${p.dimension}|${p.pattern.toLowerCase()}`;
       if (!byPattern.has(key)) byPattern.set(key, p);
     }
-    const items = [...byPattern.values()].sort((a, b) => b.confidence - a.confidence);
+    // Cap the served set: live `observed` signals accrue over time, so bound it
+    // to the richest few (consolidation distills further in Slice 3).
+    const items = [...byPattern.values()].sort((a, b) => b.confidence - a.confidence).slice(0, 28);
     return { pack: assemblePack(items), items };
   }
 

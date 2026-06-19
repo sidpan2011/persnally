@@ -72,43 +72,54 @@ async function recordRead(scope: string, purpose: string | undefined, items: num
 
 // ── persnally_track — write path ────────────────────────────
 
+const TOPIC_SCHEMA = z.object({
+  topic: z.string().describe("The topic, decision, or preference (e.g. 'Rust async programming', 'chose SQLite over Postgres')"),
+  weight: z.number().min(0).max(1),
+  intent: z.enum(["learning", "building", "researching", "deciding", "discussing", "debugging"]),
+  sentiment: z.enum(["positive", "negative", "neutral"]),
+  depth: z.enum(["mention", "moderate", "deep"]),
+  category: z.enum(["technology", "business", "finance", "career", "health", "science", "creative", "education", "lifestyle", "news", "other"]),
+  entities: z.array(z.string()),
+});
+const STYLE_SCHEMA = z.object({
+  dimension: z.enum(["voice", "convention", "emphasis", "format", "workflow"])
+    .describe("voice=tone/phrasing; convention=tools/rules; emphasis=what they insist on; format=structure; workflow=how they work"),
+  pattern: z.string().min(1).describe("a short, reusable instruction — e.g. 'prefers pnpm over npm', 'wants the falsification first', 'terse, no filler'"),
+  polarity: z.enum(["does", "avoids", "prefers", "insists"]),
+  confidence: z.number().min(0).max(1).default(0.6),
+  evidence: z.string().default("").describe("a brief quote or why you believe it"),
+});
+
 server.tool(
   "persnally_track",
-  `Track topics and interests from the current conversation to build the user's personal context.
+  `Track what builds the user's lasting context. Two kinds of signal, both optional — send whichever this conversation produced.
 
-Call this when the user discusses topics they care about — and when they make a decision, accept or reject an option, or express a clear preference, capture that as its own signal rather than folding it into a broader topic.
+TOPICS — what they're engaged with (interests, decisions, accepted/rejected options).
+- 1-5 per conversation; weight = centrality (0.1 brief … 1.0 main focus); depth = mention|moderate|deep; sentiment 'negative' deprioritizes; entities are specific names ("Next.js", not "web framework").
 
-GUIDELINES:
-- Extract 1-5 signals per conversation, focused on what the user is ACTIVELY engaged with
-- Weight = how central to the conversation (0.1 brief, 1.0 main focus)
-- Depth: "mention" | "moderate" | "deep" (extensive discussion or problem-solving)
-- Sentiment: "negative" means frustration or dislike (deprioritizes, never boosts)
-- Entities are specific names: "Next.js" not "web framework"
+STYLE — HOW they write and work, so every AI can answer like them. High value, but easy to over-send: record only a CLEAR, REPEATED tell, never a one-off, at most 1-3 per conversation. Examples:
+- voice: "terse, no filler" · convention: "prefers pnpm over npm", "no default exports" · emphasis: "wants the falsification first" · format: "answers in bullet points" · workflow: "kills ideas fast".
+- Skip anything generic or already obvious. When unsure, don't.
 
-The user opted in. Only structured signals are stored, locally, never raw messages.`,
+The user opted in. Only these structured signals are stored, locally, never raw messages.`,
   {
-    topics: z.array(z.object({
-      topic: z.string().describe("The topic, decision, or preference (e.g. 'Rust async programming', 'chose SQLite over Postgres')"),
-      weight: z.number().min(0).max(1),
-      intent: z.enum(["learning", "building", "researching", "deciding", "discussing", "debugging"]),
-      sentiment: z.enum(["positive", "negative", "neutral"]),
-      depth: z.enum(["mention", "moderate", "deep"]),
-      category: z.enum(["technology", "business", "finance", "career", "health", "science", "creative", "education", "lifestyle", "news", "other"]),
-      entities: z.array(z.string()),
-    })).min(1),
+    topics: z.array(TOPIC_SCHEMA).optional(),
+    style: z.array(STYLE_SCHEMA).optional(),
   },
-  async ({ topics }) =>
+  async ({ topics, style }) =>
     guarded(async () => {
-      logEvent("tool_call", { tool: "persnally_track", topics: topics.length });
+      logEvent("tool_call", { tool: "persnally_track", topics: topics?.length ?? 0, style: style?.length ?? 0 });
       const client = clientSlug();
-      const events = topics.map((t) => ({
-        type: "signal.topic",
-        source: `mcp:${client}`,
-        payload: t,
-        provenance: { kind: "mcp", client },
-      }));
+      const events = [
+        ...(topics ?? []).map((t) => ({ type: "signal.topic", source: `mcp:${client}`, payload: t, provenance: { kind: "mcp", client } })),
+        ...(style ?? []).map((s) => ({ type: "signal.style", source: `mcp:${client}`, payload: { ...s, basis: "observed" }, provenance: { kind: "mcp", client } })),
+      ];
+      if (!events.length) return text("Nothing to track — pass topics and/or style signals.");
       await daemonPost("/events", events);
-      return text(`Recorded ${topics.length} signal(s): ${topics.map((t) => t.topic).join(", ")}.`);
+      const parts: string[] = [];
+      if (topics?.length) parts.push(`${topics.length} topic(s): ${topics.map((t) => t.topic).join(", ")}`);
+      if (style?.length) parts.push(`${style.length} style signal(s)`);
+      return text(`Recorded ${parts.join(" · ")}.`);
     }),
 );
 
