@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { topicWeight, type WeightSignal } from "./decay.js";
 import { normalizeTopic, validateEvent, type PersnallyEvent } from "./events.js";
 import { DATA_DIR } from "./paths.js";
+import { assemblePack, type StyleSignal } from "./stylometry.js";
 
 const VIEW_SCHEMA_VERSION = 2;
 
@@ -234,6 +235,26 @@ export class EventStore {
       | { headline: string; sections: string; generated_at: string; model: string }
       | undefined;
     return row ? { ...row, sections: JSON.parse(row.sections) } : null;
+  }
+
+  /** The voice/convention profile — style signals deduped by pattern (newest wins), richest first. */
+  voice(): { pack: string; items: StyleSignal[] } {
+    const byPattern = new Map<string, StyleSignal>();
+    // query() returns ts DESC, so the first occurrence of a pattern is the most recent.
+    for (const e of this.query({ type: "signal.style", limit: 1_000_000 })) {
+      const p = e.payload as StyleSignal;
+      const key = `${p.dimension}|${p.pattern.toLowerCase()}`;
+      if (!byPattern.has(key)) byPattern.set(key, p);
+    }
+    const items = [...byPattern.values()].sort((a, b) => b.confidence - a.confidence);
+    return { pack: assemblePack(items), items };
+  }
+
+  /** Drops style signals of one basis so a deterministic re-run replaces them (live `observed`/`correction` signals are kept). */
+  clearStyleByBasis(basis: string): number {
+    return this.db
+      .prepare("DELETE FROM events WHERE type = 'signal.style' AND json_extract(payload, '$.basis') = ?")
+      .run(basis).changes;
   }
 
   /** Hard-deletes matching topic events plus derived events referencing them, then rebuilds. */

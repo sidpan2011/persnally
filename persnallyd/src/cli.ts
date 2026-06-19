@@ -9,7 +9,7 @@ import { existsSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { applyApiKey, configPath, loadConfig, saveConfig } from "./config.js";
-import { CLIENTS, connectAll, connectClient, type Client } from "./connect.js";
+import { CLIENTS, connectAll, connectClient, installClaudeCodeHook, type Client } from "./connect.js";
 import { runConsolidation } from "./consolidate.js";
 import { chooseExtractor } from "./llm.js";
 import { CATEGORIES, clearScope, loadScopes, setScope, type Category } from "./permissions.js";
@@ -26,6 +26,8 @@ import {
   removePidFile, runningPid, startDetached, stopDaemon, writePidFile,
 } from "./lifecycle.js";
 import { newEvent } from "./events.js";
+import { proseLines } from "./prose.js";
+import { analyzeVoice } from "./stylometry.js";
 import { renderProfile, synthesizeProfile } from "./profile.js";
 import { DEFAULT_DB_PATH, EventStore } from "./store.js";
 
@@ -42,6 +44,7 @@ Usage:
   persnallyd import chatgpt <path>  Import a ChatGPT export dir or conversations.json (needs ANTHROPIC_API_KEY)
   persnallyd import git <path> [--author <email>]   Import repo activity (offline, no LLM); path = repo or folder of repos
   persnallyd profile                Synthesize your profile from the store
+  persnallyd voice                  Refresh your voice fingerprint from Claude Code transcripts (offline, no LLM)
   persnallyd consolidate            Reflect now: refresh decay, add behavior patterns, re-synthesize
   persnallyd show [topics|events|profile]   Show topics (default), recent events, or the profile
   persnallyd context [--full]       Emit profile + interests for AI injection (records a context read)
@@ -166,8 +169,13 @@ async function main(): Promise<void> {
       store.close();
 
       // 6. AI clients
-      for (const { client, file } of connectAll()) {
+      const connections = connectAll();
+      for (const { client, file } of connections) {
         console.log(file ? `✓ Connected ${client}` : `· ${client} not installed — skipped`);
+      }
+      if (connections.some((r) => r.client === "claude-code" && r.file)) {
+        try { installClaudeCodeHook(); console.log("✓ Context hook installed (injects on every Claude Code session)"); }
+        catch (e) { console.error(`· Context hook skipped: ${e instanceof Error ? e.message : e}`); }
       }
 
       console.log(`\nDone${imported ? ` — ${imported} events imported` : ""}. Dashboard: http://127.0.0.1:${port}`);
@@ -203,6 +211,14 @@ async function main(): Promise<void> {
       const results = target ? [{ client: target, file: connectClient(target) }] : connectAll();
       for (const { client, file } of results) {
         console.log(file ? `Connected ${client} (${file})` : `${client} not installed — skipped`);
+      }
+      // Claude Code also gets a SessionStart hook so every session injects context automatically.
+      if (results.some((r) => r.client === "claude-code" && r.file)) {
+        try {
+          console.log(`Installed Claude Code context hook (${installClaudeCodeHook()})`);
+        } catch (e) {
+          console.error(`Context hook not installed: ${e instanceof Error ? e.message : e}`);
+        }
       }
       return;
     }
@@ -285,6 +301,20 @@ async function main(): Promise<void> {
       console.log(renderProfile(profile));
       return;
     }
+    case "voice": {
+      // Deterministic, offline, re-runnable — refreshes the stylometry layer in place.
+      const dir = args[0] || DEFAULT_TRANSCRIPTS_DIR;
+      const { parsed } = parseClaudeCodeTranscripts(dir);
+      const corpus = parsed.conversations.flatMap((c) => proseLines(c.userMessages.join("\n")));
+      const v = analyzeVoice(corpus);
+      if (!v.signals.length) return die(`Not enough prose in ${dir} to fingerprint a voice yet.`);
+      const store = new EventStore();
+      store.clearStyleByBasis("stylometry"); // replace, don't accumulate, across re-runs
+      store.append(v.signals.map((s) => newEvent("signal.style", "cli", s, { kind: "local", surface: "cli" })));
+      store.close();
+      console.log(`Voice fingerprint refreshed from ${v.prompts} prompts.\n\n${v.pack}`);
+      return;
+    }
     case "show": {
       const store = new EventStore();
       if (args[0] === "profile") {
@@ -310,6 +340,7 @@ async function main(): Promise<void> {
       // context-reads metric exactly like the MCP persnally_context tool. `show`
       // stays side-effect-free so manual inspection never inflates the metric.
       const full = args.includes("--full");
+      const hook = args.includes("--hook");
       const store = new EventStore();
       const profile = store.getProfile();
       const topics = store.topics(full ? 25 : 12);
@@ -333,14 +364,18 @@ async function main(): Promise<void> {
         store.append([newEvent(
           "context.read",
           "cli",
-          { scope: full ? "full" : "brief", client_purpose: "session-start hook", items },
+          { scope: full ? "full" : "brief", client_purpose: hook ? "session-start hook" : "cli context read", items },
           { kind: "local", surface: "cli" },
         )]);
       } catch (e) {
         console.error("persnally: context.read not recorded:", e instanceof Error ? e.message : e);
       }
       store.close();
-      console.log(out.join("\n"));
+      const rendered = out.join("\n");
+      // --hook emits the SessionStart envelope itself, so the installed hook needs no jq.
+      console.log(hook
+        ? JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: rendered } })
+        : rendered);
       return;
     }
     case "forget": {
