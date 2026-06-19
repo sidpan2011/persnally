@@ -3,12 +3,20 @@
  * Only touches clients that are actually installed; merges, never clobbers.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const CLIENTS = ["claude-code", "claude-desktop", "cursor"] as const;
 export type Client = (typeof CLIENTS)[number];
+
+/** Write JSON via temp file + rename: a crash mid-write can't corrupt the user's config. */
+function writeJsonAtomic(file: string, cfg: unknown): void {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(cfg, null, 2) + "\n");
+  renameSync(tmp, file);
+}
 
 function configPathFor(client: Client): { file: string; installed: boolean } {
   const home = homedir();
@@ -52,8 +60,7 @@ export function connectClient(client: Client): string | null {
   }
   const servers = (cfg.mcpServers ??= {}) as Record<string, unknown>;
   servers.persnally = { command: "node", args: [mcpServerPath()] };
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+  writeJsonAtomic(file, cfg);
   return file;
 }
 
@@ -86,8 +93,7 @@ export function installClaudeCodeHook(): string {
     hooks: [{ type: "command", command: SESSION_START_COMMAND, timeout: 10, statusMessage: "Loading your Persnally context…" }],
   });
   hooks.SessionStart = others;
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+  writeJsonAtomic(file, cfg);
   return file;
 }
 
