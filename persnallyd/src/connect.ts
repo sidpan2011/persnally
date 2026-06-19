@@ -3,12 +3,20 @@
  * Only touches clients that are actually installed; merges, never clobbers.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const CLIENTS = ["claude-code", "claude-desktop", "cursor"] as const;
 export type Client = (typeof CLIENTS)[number];
+
+/** Write JSON via temp file + rename: a crash mid-write can't corrupt the user's config. */
+function writeJsonAtomic(file: string, cfg: unknown): void {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(cfg, null, 2) + "\n");
+  renameSync(tmp, file);
+}
 
 function configPathFor(client: Client): { file: string; installed: boolean } {
   const home = homedir();
@@ -52,8 +60,40 @@ export function connectClient(client: Client): string | null {
   }
   const servers = (cfg.mcpServers ??= {}) as Record<string, unknown>;
   servers.persnally = { command: "node", args: [mcpServerPath()] };
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(cfg, null, 2) + "\n");
+  writeJsonAtomic(file, cfg);
+  return file;
+}
+
+// The hook self-renders the SessionStart envelope (`context --hook`), so no jq dependency.
+const SESSION_START_COMMAND = "persnallyd context --hook 2>/dev/null";
+
+interface HookEntry { type?: string; command?: string; timeout?: number; statusMessage?: string }
+interface HookGroup { hooks?: HookEntry[] }
+
+/**
+ * Installs (or upgrades) the Persnally SessionStart hook in Claude Code's user
+ * settings so every session injects the user's context. Merges into existing
+ * settings, leaves other tools' hooks untouched, and is idempotent: a prior
+ * Persnally entry (including the old `show topics` form) is replaced, not duplicated.
+ */
+export function installClaudeCodeHook(): string {
+  const file = join(homedir(), ".claude", "settings.json");
+  let cfg: Record<string, unknown> = {};
+  if (existsSync(file)) {
+    try {
+      cfg = JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>;
+    } catch {
+      throw new Error(`${file} is not valid JSON — fix it, then run \`persnallyd connect claude-code\` again`);
+    }
+  }
+  const hooks = (cfg.hooks ??= {}) as Record<string, unknown>;
+  const existing = Array.isArray(hooks.SessionStart) ? (hooks.SessionStart as HookGroup[]) : [];
+  const others = existing.filter((g) => !g.hooks?.some((h) => /persnall/i.test(h.command ?? "")));
+  others.push({
+    hooks: [{ type: "command", command: SESSION_START_COMMAND, timeout: 10, statusMessage: "Loading your Persnally context…" }],
+  });
+  hooks.SessionStart = others;
+  writeJsonAtomic(file, cfg);
   return file;
 }
 

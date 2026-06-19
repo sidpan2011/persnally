@@ -41,3 +41,29 @@ test("connect --all writes installed clients, merges configs, skips missing", as
 test("connect rejects unknown clients", async () => {
   await assert.rejects(run("node", [CLI, "connect", "vscode"], { env }), /unknown client/);
 });
+
+test("connect claude-code installs the SessionStart hook, merging + upgrading idempotently", async () => {
+  const settings = join(home, ".claude", "settings.json");
+  mkdirSync(join(home, ".claude"), { recursive: true });
+  // Pre-existing: an OLD persnally hook (to upgrade) + an unrelated tool's hook (to preserve).
+  writeFileSync(settings, JSON.stringify({
+    permissions: { allow: ["Bash(ls:*)"] },
+    hooks: {
+      SessionStart: [
+        { hooks: [{ type: "command", command: "persnallyd show topics | jq -Rs ." }] },
+        { hooks: [{ type: "command", command: "echo unrelated-tool" }] },
+      ],
+    },
+  }));
+
+  await run("node", [CLI, "connect", "claude-code"], { env });
+  await run("node", [CLI, "connect", "claude-code"], { env }); // re-run must stay idempotent
+
+  const s = JSON.parse(readFileSync(settings, "utf-8"));
+  const commands = (s.hooks.SessionStart as { hooks: { command: string }[] }[]).flatMap((g) => g.hooks.map((h) => h.command));
+  const persnally = commands.filter((c) => /persnall/i.test(c));
+  assert.equal(persnally.length, 1, "exactly one Persnally hook — no duplicates");
+  assert.match(persnally[0]!, /persnallyd context --hook/, "old hook upgraded to the jq-free command");
+  assert.ok(commands.includes("echo unrelated-tool"), "other tools' hooks preserved");
+  assert.deepEqual(s.permissions.allow, ["Bash(ls:*)"], "unrelated settings preserved");
+});

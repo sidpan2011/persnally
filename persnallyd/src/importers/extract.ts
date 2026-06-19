@@ -6,6 +6,8 @@
 import { z } from "zod";
 import { newEvent, safeIso, uuidv7, PAYLOAD_SCHEMAS, type PersnallyEvent } from "../events.js";
 import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
+import { proseLines, stripNoise } from "../prose.js";
+import { analyzeVoice } from "../stylometry.js";
 
 const MAX_CONVO_CHARS = 30_000;
 
@@ -40,10 +42,14 @@ export async function extractEvents(
 ): Promise<ImportResult> {
   const batch = uuidv7();
   const events: PersnallyEvent[] = [];
+  const voiceCorpus: string[] = []; // clean prose for the deterministic voice fingerprint
 
   for (const convo of parsed.conversations) {
     if (!convo.userMessages.length) continue;
-    const text = convo.userMessages.join("\n").slice(0, MAX_CONVO_CHARS);
+    const joined = convo.userMessages.join("\n");
+    voiceCorpus.push(...proseLines(joined));
+    const text = stripNoise(joined).slice(0, MAX_CONVO_CHARS); // strip pasted paths/URLs/logs before the LLM sees it
+    if (!text) continue;
     const result = await extract({
       model,
       instruction:
@@ -76,6 +82,11 @@ export async function extractEvents(
     for (const a of assertions) {
       events.push(newEvent("signal.assertion", opts.source, a, { kind: "import", batch, file: opts.file }));
     }
+  }
+
+  // Deterministic voice fingerprint over the user's own prose — no LLM, no tokens.
+  for (const s of analyzeVoice(voiceCorpus).signals) {
+    events.push(newEvent("signal.style", opts.source, s, { kind: "import", batch, file: opts.file }));
   }
 
   const span = parsed.conversations.map((c) => c.created_at).sort();

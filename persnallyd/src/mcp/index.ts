@@ -127,11 +127,12 @@ Call this at the START of a conversation (or when personalization would improve 
     guarded(async () => {
       logEvent("tool_call", { tool: "persnally_context", detail });
       const client = encodeURIComponent(getClient());
-      const [profile, topics] = await Promise.all([
+      const [profile, topics, voice] = await Promise.all([
         daemonGet<Profile>(`/profile?client=${client}`),
         daemonGet<TopicRow[]>(`/topics?limit=${detail === "full" ? 25 : 10}&client=${client}`),
+        daemonGet<{ pack: string; items: unknown[] }>("/voice"),
       ]);
-      if (!profile && !topics?.length) {
+      if (!profile && !topics?.length && !voice?.pack) {
         return text("No context yet — the user hasn't imported data or tracked any signals.");
       }
       let out = "";
@@ -141,6 +142,11 @@ Call this at the START of a conversation (or when personalization would improve 
         const sections = detail === "full" ? profile.sections : profile.sections.slice(0, 3);
         items += sections.length;
         out += sections.map((s) => `## ${s.title}\n${s.body}`).join("\n\n");
+      }
+      // The prescriptive layer: how to write/answer so it fits this user, not a generic one.
+      if (voice?.pack) {
+        out += `${out ? "\n\n" : ""}# How to write for this user\n${voice.pack}`;
+        items += voice.items?.length ?? 0;
       }
       if (topics?.length) {
         out += `\n\n# Current interests (decay-weighted)\n`;
