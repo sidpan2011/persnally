@@ -3,12 +3,34 @@
 > Internal launch kit. **Goal:** in one sitting, get a developer to say *"I want this
 > running on my machine"* — not *"neat."* That sentence is the Phase-0/1 exit gate.
 
-## The framing (locked by the 2026-06 validation)
+## The framing (locked by the 2026-06 validation, re-checked 2026-06-20)
 
 Lead with the **self-portrait**, not "it learns as you chat." Passive capture measured
-~0% organic, and "the agent remembers facts across sessions" is now a free Markdown
-extension (pi-mem et al.). The wow that's *yours* and can't be gotten free: **a
-startling, evidence-linked model of who you are, in 5 minutes, that every tool reads.**
+~0% organic, and "the agent remembers facts across sessions" is now commodity — a free
+Markdown extension, and a local-first Claude Code memory daemon (claude-mem, ~65–83K
+stars) already does session memory in our exact form factor. The wow that's *yours* and
+can't be gotten free: **a startling, evidence-linked model of who you *are* — taste,
+decisions, conventions — in 5 minutes, that every tool reads and you can audit.**
+
+Drop the contested words. Don't say "cross-vendor," "user-owned," or "private" — Plurality
+and Maximem/Vity say all three now. Say **a portable model of you** (not memory), **verify-it
+custody** (local plaintext + source-available — they're encrypted *cloud*), and **personal,
+not project** (claude-mem remembers your *repo*; Persnally models *you*, across chat + dev).
+
+## Objection handling (rehearse these — a 2026 dev will ask)
+
+- **"How is this different from claude-mem?"** → "claude-mem is memory *for the agent*,
+  scoped to your coding CLIs — it remembers this *project*. Persnally models *you* — your
+  taste and decisions — across every AI including your ChatGPT/Claude chats, not just code.
+  Different product, same respect for local-first."
+- **"Isn't this just Plurality / Maximem / Mem0?"** → "Those live in their cloud — encrypted,
+  but you're trusting their servers and closed code. Persnally is plaintext on *your* disk and
+  the source is auditable. Trust-me vs verify-it. Here's the file; here's the delete button."
+- **"Can't Claude/Gemini just do this?"** → "They import memory *into their own cloud* as a
+  switcher tool. A neutral layer that sits across all of them and stays on your machine is
+  something none of them can ship without contradicting their own business." *(If asked for
+  proof, don't overclaim — incumbent two-way/API memory is the one thing to re-check before
+  any public launch.)*
 
 ## Pre-flight (never do this live)
 
