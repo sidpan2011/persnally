@@ -7,7 +7,7 @@ import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { topicWeight, type WeightSignal } from "./decay.js";
-import { normalizeTopic, validateEvent, type PersnallyEvent } from "./events.js";
+import { newEvent, normalizeTopic, validateEvent, type PersnallyEvent } from "./events.js";
 import { DATA_DIR } from "./paths.js";
 import { assemblePack, type StyleSignal } from "./stylometry.js";
 
@@ -237,17 +237,53 @@ export class EventStore {
     return row ? { ...row, sections: JSON.parse(row.sections) } : null;
   }
 
-  /** The voice/convention profile — style signals deduped by pattern (newest wins), richest first. */
+  /** Logical key for one style pattern — stable across re-imports/re-observations. */
+  private styleKey(dimension: string, pattern: string): string {
+    return `style:${dimension}|${pattern.toLowerCase()}`;
+  }
+
+  /** Patterns the user has explicitly forgotten — a delete correction tombstones the key permanently. */
+  private forgottenStyleKeys(): Set<string> {
+    const forgotten = new Set<string>();
+    for (const e of this.query({ type: "user.correction", limit: 1_000_000 })) {
+      const p = e.payload as { target_id: string; action: string };
+      if (p.action === "delete" && p.target_id.startsWith("style:")) forgotten.add(p.target_id);
+    }
+    return forgotten;
+  }
+
+  /** The voice/convention profile — style signals deduped by pattern (newest wins), richest first, forgotten patterns excluded. */
   voice(): { pack: string; items: StyleSignal[] } {
+    const forgotten = this.forgottenStyleKeys();
     const byPattern = new Map<string, StyleSignal>();
     // query() returns ts DESC, so the first occurrence of a pattern is the most recent.
     for (const e of this.query({ type: "signal.style", limit: 1_000_000 })) {
       const p = e.payload as StyleSignal;
-      const key = `${p.dimension}|${p.pattern.toLowerCase()}`;
-      if (!byPattern.has(key)) byPattern.set(key, p);
+      const key = this.styleKey(p.dimension, p.pattern);
+      if (forgotten.has(key) || byPattern.has(key)) continue;
+      byPattern.set(key, p);
     }
-    const items = [...byPattern.values()].sort((a, b) => b.confidence - a.confidence);
+    // Cap the served set: live `observed` signals accrue over time, so bound it
+    // to the richest few (consolidation prunes the stored backlog separately).
+    const items = [...byPattern.values()].sort((a, b) => b.confidence - a.confidence).slice(0, 28);
     return { pack: assemblePack(items), items };
+  }
+
+  /**
+   * Hard-deletes a style pattern's events and writes a delete correction so it
+   * stays gone even if stylometry or live capture re-derives it later — the
+   * "deletable for real" promise extended to the voice layer.
+   */
+  forgetStyle(dimension: string, pattern: string): number {
+    const key = this.styleKey(dimension, pattern);
+    const candidates = this.query({ type: "signal.style", limit: 1_000_000 }).filter(
+      (e) => this.styleKey((e.payload as StyleSignal).dimension, (e.payload as StyleSignal).pattern) === key,
+    );
+    const del = this.db.prepare("DELETE FROM events WHERE id = ?");
+    const run = this.db.transaction((toDelete: string[]) => { for (const id of toDelete) del.run(id); });
+    run(candidates.map((e) => e.id));
+    this.append([newEvent("user.correction", "dashboard", { target_id: key, action: "delete", reason: "" }, { kind: "local", surface: "dashboard" })]);
+    return candidates.length;
   }
 
   /** Drops style signals of one basis so a deterministic re-run replaces them (live `observed`/`correction` signals are kept). */
@@ -255,6 +291,28 @@ export class EventStore {
     return this.db
       .prepare("DELETE FROM events WHERE type = 'signal.style' AND json_extract(payload, '$.basis') = ?")
       .run(basis).changes;
+  }
+
+  /**
+   * Consolidation distill: bounds the stored style backlog so live capture
+   * never grows unbounded. Keeps the richest signal per pattern, capped overall.
+   */
+  pruneStyle(maxTotal = 80): number {
+    const byPattern = new Map<string, PersnallyEvent>();
+    for (const e of this.query({ type: "signal.style", limit: 1_000_000 })) {
+      const p = e.payload as StyleSignal;
+      const key = this.styleKey(p.dimension, p.pattern);
+      const existing = byPattern.get(key);
+      if (!existing || (existing.payload as StyleSignal).confidence < p.confidence) byPattern.set(key, e);
+    }
+    const ranked = [...byPattern.entries()].sort((a, b) => (b[1].payload as StyleSignal).confidence - (a[1].payload as StyleSignal).confidence);
+    const keepIds = new Set(ranked.slice(0, maxTotal).map(([, e]) => e.id));
+    const all = this.query({ type: "signal.style", limit: 1_000_000 });
+    const toDelete = all.filter((e) => !keepIds.has(e.id)).map((e) => e.id); // drop weaker duplicates + overflow
+    const del = this.db.prepare("DELETE FROM events WHERE id = ?");
+    const run = this.db.transaction((ids: string[]) => { for (const id of ids) del.run(id); });
+    run(toDelete);
+    return toDelete.length;
   }
 
   /** Hard-deletes matching topic events plus derived events referencing them, then rebuilds. */

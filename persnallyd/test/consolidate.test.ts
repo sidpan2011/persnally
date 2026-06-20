@@ -34,6 +34,24 @@ test("without an engine: refreshes decay, emits no assertions", async () => {
   assert.ok(store.topics().length >= 1, "decay rebuild ran");
 });
 
+test("consolidation prunes the style backlog so live capture stays bounded", async () => {
+  const d3 = mkdtempSync(join(tmpdir(), "consolidate-style-"));
+  const s3 = new EventStore(join(d3, "t.db"));
+  process.env.PERSNALLY_DIR = d3;
+  try {
+    const style = (pattern: string, confidence: number) =>
+      newEvent("signal.style", "mcp:cursor", { dimension: "voice", pattern, polarity: "does", confidence, evidence: "x", basis: "observed" }, { kind: "mcp", client: "cursor" });
+    s3.append(Array.from({ length: 90 }, (_, i) => style(`pattern-${i}`, i / 100)));
+    const r = await runConsolidation(s3, null, new Date("2026-06-13T03:00:00"));
+    assert.ok(r.stylePruned >= 10, "overflow beyond the cap is pruned");
+    assert.ok(s3.query({ type: "signal.style", limit: 1000 }).length <= 80, "backlog bounded to the cap");
+  } finally {
+    s3.close();
+    delete process.env.PERSNALLY_DIR;
+    rmSync(d3, { recursive: true, force: true });
+  }
+});
+
 test("with engine + enough signal: emits derived behavior assertions", async () => {
   // Fresh store so last_consolidation from the previous test doesn't filter these out.
   const d2 = mkdtempSync(join(tmpdir(), "consolidate-2-"));
