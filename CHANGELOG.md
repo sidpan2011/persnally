@@ -2,6 +2,14 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.3.2] - 2026-06-21
+
+### Added
+- **Automatic capture of new chats** — the daemon now ingests new Claude Code sessions on its background loop (every 30 min, plus an immediate pass on startup), so your context keeps growing with zero action and no dependence on the model remembering to call `persnally_track`. Incremental: sessions already in the store are skipped by conversation id, so nothing is re-imported or duplicated.
+
+### Fixed
+- Import extraction is now resilient per conversation — a single malformed model response (e.g. an out-of-enum value) is skipped and retried on the next pass instead of aborting the entire import batch.
+
 ## [2.3.1] - 2026-06-20
 
 ### Fixed
