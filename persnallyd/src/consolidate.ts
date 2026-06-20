@@ -18,10 +18,13 @@ const PROFILE_MIN_SIGNALS = 10;
 const PROVENANCE_CAP = 100;
 export const CONSOLIDATION_HOUR = 3; // local time
 
+const STYLE_BACKLOG_CAP = 80;
+
 export interface ConsolidationResult {
   newSignals: number;
   assertions: number;
   profileRefreshed: boolean;
+  stylePruned: number;
 }
 
 /** Run once per local day, at or after the consolidation hour. */
@@ -51,6 +54,10 @@ export async function runConsolidation(
 
   // Decay shifts daily even with no new events — always re-derive.
   store.rebuild(now.getTime());
+
+  // Distill the voice layer: live `observed` capture has no equivalent of decay,
+  // so bound the backlog to the richest signals (capture small, store distilled).
+  const stylePruned = store.pruneStyle(STYLE_BACKLOG_CAP);
 
   let assertions: PersnallyEvent[] = [];
   if (engine && newSignals.length >= ASSERTION_MIN_SIGNALS) {
@@ -86,5 +93,5 @@ export async function runConsolidation(
   }
 
   saveConfig({ last_consolidation: now.toISOString() });
-  return { newSignals: newSignals.length, assertions: assertions.length, profileRefreshed };
+  return { newSignals: newSignals.length, assertions: assertions.length, profileRefreshed, stylePruned };
 }

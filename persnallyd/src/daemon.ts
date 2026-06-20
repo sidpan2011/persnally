@@ -66,6 +66,11 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
         // Stylistic, not topical — served to every client (it's how you write, not what about).
         return json(res, 200, store.voice());
       }
+      if (req.method === "DELETE" && url.pathname.startsWith("/voice/")) {
+        const [, , dimension, pattern] = url.pathname.split("/");
+        if (!dimension || !pattern) return json(res, 400, { error: "dimension and pattern required" });
+        return json(res, 200, { deleted: store.forgetStyle(dimension, decodeURIComponent(pattern)) });
+      }
       if (req.method === "GET" && url.pathname === "/scopes") {
         return json(res, 200, loadScopes());
       }
@@ -139,7 +144,7 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
     try {
       const engine = await chooseExtractor("extract").catch(() => null);
       const r = await runConsolidation(store, engine);
-      console.error(`consolidation: ${r.newSignals} new signals, ${r.assertions} assertions, profile ${r.profileRefreshed ? "refreshed" : "kept"}`);
+      console.error(`consolidation: ${r.newSignals} new signals, ${r.assertions} assertions, profile ${r.profileRefreshed ? "refreshed" : "kept"}, ${r.stylePruned} style signals pruned`);
     } catch (e) {
       console.error("consolidation failed:", e instanceof Error ? e.message : e);
     }

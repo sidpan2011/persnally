@@ -96,8 +96,10 @@
   .voice-groups { display: flex; flex-direction: column; gap: 16px; }
   .vglabel { font-size: 11px; text-transform: uppercase; letter-spacing: 1.3px; color: var(--dim); margin-bottom: 9px; }
   .vchips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .vchip { font-size: 13px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 13px; }
-  .vchip i { color: var(--faint); font-style: normal; font-size: 11px; margin-left: 5px; }
+  .vchip { font-size: 13px; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 5px 9px 5px 13px; display: inline-flex; align-items: center; gap: 7px; }
+  .vchip i { color: var(--faint); font-style: normal; font-size: 11px; }
+  .vdel { background: none; border: none; color: var(--faint); cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; transition: color .16s; }
+  .vdel:hover { color: var(--text); }
   .evidence { margin-top: 11px; border-top: 1px solid var(--line); padding-top: 11px; display: none; }
   .evidence.open { display: block; }
   .ev-item { font-size: 12.5px; color: var(--dim); padding: 5px 0; line-height: 1.5; }
@@ -362,10 +364,18 @@ function renderVoice(voice) {
   for (const d of order) {
     if (!groups[d]) continue;
     html += `<div><div class="vglabel">${esc(label[d])}</div><div class="vchips">` +
-      groups[d].map((it) => `<span class="vchip" title="${esc(it.evidence || "")}">${esc(it.pattern)}${it.dimension === "emphasis" && it.evidence ? ` <i>${esc(it.evidence)}</i>` : ""}</span>`).join("") +
+      groups[d].map((it) => `<span class="vchip" title="${esc(it.evidence || "")}">${esc(it.pattern)}${it.dimension === "emphasis" && it.evidence ? ` <i>${esc(it.evidence)}</i>` : ""}` +
+        `<button class="vdel" data-dim="${esc(it.dimension)}" data-pattern="${esc(it.pattern)}" title="Forget this — it won't be re-learned">×</button></span>`).join("") +
       `</div></div>`;
   }
   $("voiceCard").innerHTML = html + `</div>`;
+  document.querySelectorAll(".vdel").forEach((b) => b.addEventListener("click", async (ev) => {
+    ev.stopPropagation();
+    if (!confirm(`Forget "${b.dataset.pattern}"? It won't be re-learned.`)) return;
+    if (!DEMO) await fetch(`/voice/${encodeURIComponent(b.dataset.dim)}/${encodeURIComponent(b.dataset.pattern)}`, { method: "DELETE" });
+    const v = DEMO ? null : await get("/voice");
+    renderVoice(v);
+  }));
 }
 
 /* ── receipts ── */
@@ -569,8 +579,9 @@ $("reflect").onclick = async () => {
 };
 setInterval(async () => {
   if (DEMO) return;
-  const reads = await get("/events?type=context.read&limit=60"), stats = await get("/stats");
+  const [reads, stats, voice] = await Promise.all([get("/events?type=context.read&limit=60"), get("/stats"), get("/voice")]);
   if (reads && stats) renderReads(reads, (stats.byType && stats.byType["context.read"]) || reads.length);
+  if (voice) renderVoice(voice); // live: voice signals captured mid-session show up without a reload
 }, 25000);
 
 loadAll();
