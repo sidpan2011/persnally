@@ -14,7 +14,7 @@ import { runConsolidation } from "./consolidate.js";
 import { chooseExtractor } from "./llm.js";
 import { CATEGORIES, clearScope, loadScopes, setScope, type Category } from "./permissions.js";
 import { alreadyImported, DENSITY_QUESTIONS, detectExports, eventsFromAnswers, isThin, markImported } from "./setup.js";
-import { DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
+import { autoImportNewSessions, DEFAULT_PORT, startDaemon, VERSION } from "./daemon.js";
 import { extractChatGPTEvents, parseChatGPTExport } from "./importers/chatgpt.js";
 import { extractClaudeEvents, parseClaudeExport } from "./importers/claude.js";
 import {
@@ -471,6 +471,8 @@ async function main(): Promise<void> {
       process.on("uncaughtException", (e) => { console.error("uncaughtException:", e); process.exit(1); });
       console.error(`persnallyd v${VERSION} listening on 127.0.0.1:${port}`);
       console.error(`Dashboard: http://127.0.0.1:${port}`);
+      // Catch up on chats since the daemon last ran; the timer takes it from here.
+      void autoImportNewSessions(store);
       return;
     }
     default:
