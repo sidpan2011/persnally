@@ -47,22 +47,29 @@ export async function extractEvents(
   for (const convo of parsed.conversations) {
     if (!convo.userMessages.length) continue;
     const joined = convo.userMessages.join("\n");
-    voiceCorpus.push(...proseLines(joined));
+    voiceCorpus.push(...proseLines(joined)); // prose feeds the deterministic voice fingerprint even if topic extraction fails
     const text = stripNoise(joined).slice(0, MAX_CONVO_CHARS); // strip pasted paths/URLs/logs before the LLM sees it
     if (!text) continue;
-    const result = await extract({
-      model,
-      instruction:
-        "Extract 1-5 topic signals from this conversation's user messages. Weight = centrality, depth = engagement level, sentiment = user's attitude toward the topic. Capture decisions and rejected options as their own signals.",
-      schema: topicsExtraction,
-      content: `Conversation title: ${convo.name}\n\nUser messages:\n${text}`,
-    });
-    const { topics } = topicsExtraction.parse(result);
-    for (const t of topics) {
-      events.push(newEvent("signal.topic", opts.source, t,
-        { kind: "import", batch, file: opts.file, conversation_uuid: convo.uuid },
-        safeIso(convo.created_at),
-      ));
+    try {
+      const result = await extract({
+        model,
+        instruction:
+          "Extract 1-5 topic signals from this conversation's user messages. Weight = centrality, depth = engagement level, sentiment = user's attitude toward the topic. Capture decisions and rejected options as their own signals.",
+        schema: topicsExtraction,
+        content: `Conversation title: ${convo.name}\n\nUser messages:\n${text}`,
+      });
+      const { topics } = topicsExtraction.parse(result);
+      for (const t of topics) {
+        events.push(newEvent("signal.topic", opts.source, t,
+          { kind: "import", batch, file: opts.file, conversation_uuid: convo.uuid },
+          safeIso(convo.created_at),
+        ));
+      }
+    } catch (e) {
+      // One malformed extraction (e.g. the model returns an out-of-enum value)
+      // must not abort a whole multi-conversation import. Skip it — leaving no
+      // conversation_uuid marker, so the next pass retries it — and keep the rest.
+      console.error(`extract: skipped "${convo.name}" — ${(e instanceof Error ? e.message : String(e)).split("\n")[0]}`);
     }
   }
 
@@ -71,16 +78,21 @@ export async function extractEvents(
       parsed.memoryText.trim() && `Assistant's accumulated memory of the user:\n${parsed.memoryText}`,
       parsed.projects.length && `User-created projects:\n${parsed.projects.map((p) => `- ${p.name}: ${p.description}`).join("\n")}`,
     ].filter(Boolean).join("\n\n");
-    const result = await extract({
-      model,
-      instruction:
-        "Extract structured assertions about this person: facts, preferences, behaviors, skills, and context. Confidence reflects how directly the source supports the claim.",
-      schema: assertionsExtraction,
-      content: context,
-    });
-    const { assertions } = assertionsExtraction.parse(result);
-    for (const a of assertions) {
-      events.push(newEvent("signal.assertion", opts.source, a, { kind: "import", batch, file: opts.file }));
+    try {
+      const result = await extract({
+        model,
+        instruction:
+          "Extract structured assertions about this person: facts, preferences, behaviors, skills, and context. Confidence reflects how directly the source supports the claim.",
+        schema: assertionsExtraction,
+        content: context,
+      });
+      const { assertions } = assertionsExtraction.parse(result);
+      for (const a of assertions) {
+        events.push(newEvent("signal.assertion", opts.source, a, { kind: "import", batch, file: opts.file }));
+      }
+    } catch (e) {
+      // A malformed assertions response shouldn't discard the topics already gathered.
+      console.error(`extract: skipped memory/projects assertions — ${(e instanceof Error ? e.message : String(e)).split("\n")[0]}`);
     }
   }
 

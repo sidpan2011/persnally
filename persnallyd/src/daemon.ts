@@ -9,6 +9,7 @@ import { loadConfig } from "./config.js";
 import { runConsolidation, shouldRunNow } from "./consolidate.js";
 import { allowedCategories, loadScopes, type Category } from "./permissions.js";
 import { newEvent, validateEvent, type EventType, type PersnallyEvent, type Provenance } from "./events.js";
+import { importNewClaudeCodeSessions } from "./importers/claude-code.js";
 import { chooseExtractor } from "./llm.js";
 import { synthesizeProfile } from "./profile.js";
 import type { EventStore } from "./store.js";
@@ -137,8 +138,9 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
   });
   server.listen(port, "127.0.0.1");
 
-  // Nightly reflection: check every 30 min, run once per day at/after the consolidation hour.
+  // Every 30 min: pick up new Claude Code chats, then run the once-a-day reflection.
   const timer = setInterval(async () => {
+    await autoImportNewSessions(store);
     const lastRun = loadConfig().last_consolidation;
     if (!shouldRunNow(typeof lastRun === "string" ? lastRun : undefined, new Date())) return;
     try {
@@ -153,6 +155,26 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
   server.on("close", () => clearInterval(timer));
 
   return server;
+}
+
+/**
+ * Ingest Claude Code sessions created since the last pass — the daemon's
+ * automatic capture of new chats (no user action, no per-session hook). A
+ * key-less, Ollama-less machine has no extractor: skip rather than block.
+ * Never throws — capture must not take the daemon down.
+ */
+export async function autoImportNewSessions(store: EventStore): Promise<void> {
+  try {
+    const engine = await chooseExtractor("extract").catch(() => null);
+    if (!engine) return;
+    const r = await importNewClaudeCodeSessions(store, engine.extract, engine.model);
+    if (r.events) {
+      store.rebuild();
+      console.error(`auto-import: ${r.newSessions} new Claude Code session(s) → ${r.events} events`);
+    }
+  } catch (e) {
+    console.error("auto-import failed:", e instanceof Error ? e.message : e);
+  }
 }
 
 let cachedHtml: string | undefined;
