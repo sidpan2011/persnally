@@ -39,7 +39,12 @@ function zipHasConversations(zipPath: string): boolean {
   try {
     return execFileSync("unzip", ["-l", zipPath], { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] })
       .includes("conversations.json");
-  } catch {
+  } catch (e) {
+    // Only reached on a genuine read failure (unzip missing, corrupt archive,
+    // permission denied) — an ordinary non-matching zip never throws here, so
+    // this can't spam on unrelated Downloads clutter. Surface it: a real export
+    // failing silently is the worst onboarding failure mode there is.
+    console.error(`persnally: couldn't read ${zipPath} (${e instanceof Error ? e.message : e}) — skipping`);
     return false;
   }
 }

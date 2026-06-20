@@ -2,6 +2,22 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.3.0] - 2026-06-21
+
+> Note: `2.2.0` was published to npm but its release commit (version bump + this
+> changelog entry) never landed on `dev` — a branch got abandoned mid-rework and
+> the bump went with it. This entry covers everything shipped since `2.1.0`,
+> including what `2.2.0` actually contained, so the record here matches reality.
+
+### Added
+- **Voice & convention layer** — a deterministic, zero-token stylometry pass over your own prose (repeated phrases, sentence tone, hedging, format) plus live capture as you chat via `persnally_track`'s `style[]`, distilled into a "voice" pack that `persnally_context` injects so connected tools answer in your style. New `signal.style` event type, `GET /voice`, `persnallyd voice` (offline refresh).
+- **Deletable, for real** — forgetting a voice/style pattern (`DELETE /voice/:dimension/:pattern`, `persnally_forget`'s `style` param, `persnallyd forget --style`, or the `×` on a dashboard voice chip) writes a permanent correction so it stays forgotten even if stylometry or live capture would otherwise re-derive it. Nightly consolidation now also prunes the style backlog so live capture can't grow unbounded.
+- **Redesigned local dashboard** — hero self-portrait, "since you last looked" deltas, "what your AIs read about you" receipts, reflections, a "How you write" voice section, and an interactive interest constellation.
+
+### Fixed
+- Import pipeline strips pasted paths/URLs/logs and injected blocks before extraction — cleaner topics and profile.
+- A zip export that fails to read (missing `unzip`, corrupt archive, permission denied) during `persnally setup` is now surfaced, not silently treated as "no conversations found."
+
 ## [2.1.0] - 2026-06-20
 
 ### Added
