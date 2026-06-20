@@ -63,3 +63,36 @@ test("store.voice dedups by pattern (newest wins) and orders richest first", () 
   assert.match(v.pack, /Write like this user/);
   store.close();
 });
+
+test("forgetStyle deletes the pattern and tombstones it so it never resurfaces", () => {
+  const store = new EventStore(join(dir, "forget.db"));
+  const sig = newEvent("signal.style", "import:claude-code",
+    { dimension: "emphasis", pattern: "be 100% sure", polarity: "insists", confidence: 0.9, evidence: "10x", basis: "stylometry" },
+    { kind: "import", batch: "b", file: "f" });
+  store.append([sig]);
+  assert.equal(store.voice().items.length, 1);
+
+  const deleted = store.forgetStyle("emphasis", "be 100% sure");
+  assert.equal(deleted, 1, "the matching event was deleted");
+  assert.equal(store.voice().items.length, 0, "forgotten pattern excluded from voice()");
+
+  // Re-observing the SAME pattern later (e.g. a re-import or live capture) must
+  // not resurrect it — the correction is permanent, matching "deletable for real".
+  store.append([newEvent("signal.style", "mcp:cursor",
+    { dimension: "emphasis", pattern: "be 100% sure", polarity: "insists", confidence: 0.95, evidence: "again", basis: "observed" },
+    { kind: "mcp", client: "cursor" })]);
+  assert.equal(store.voice().items.length, 0, "tombstone survives re-observation");
+  store.close();
+});
+
+test("pruneStyle bounds the backlog to the richest signals per pattern", () => {
+  const store = new EventStore(join(dir, "prune.db"));
+  const sig = (pattern: string, confidence: number) =>
+    newEvent("signal.style", "mcp:cursor", { dimension: "voice", pattern, polarity: "does", confidence, evidence: "x", basis: "observed" }, { kind: "mcp", client: "cursor" });
+  store.append(Array.from({ length: 50 }, (_, i) => sig(`p-${i}`, i / 100)));
+  const pruned = store.pruneStyle(10);
+  assert.equal(pruned, 40, "drops everything beyond the cap");
+  assert.equal(store.query({ type: "signal.style", limit: 1000 }).length, 10);
+  assert.ok(store.voice().items.every((it) => Number(it.pattern.split("-")[1]) >= 40), "kept the highest-confidence patterns");
+  store.close();
+});

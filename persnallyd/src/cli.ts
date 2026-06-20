@@ -49,6 +49,7 @@ Usage:
   persnallyd show [topics|events|profile]   Show topics (default), recent events, or the profile
   persnallyd context [--full]       Emit profile + interests for AI injection (records a context read)
   persnallyd forget <topic>         Hard-delete a topic and everything derived from it
+  persnallyd forget --style <dimension> <pattern>   Forget a "how you write" pattern for good
   persnallyd forget --all           Delete all data
   persnallyd forget --batch <id>    Undo one import batch
   persnallyd status                 Store stats and daemon health
@@ -289,7 +290,7 @@ async function main(): Promise<void> {
       const store = new EventStore();
       const r = await runConsolidation(store, engine);
       store.close();
-      console.log(`Consolidation: ${r.newSignals} new signal(s) since last run, ${r.assertions} behavior assertion(s) added, profile ${r.profileRefreshed ? "refreshed" : "unchanged"}.`);
+      console.log(`Consolidation: ${r.newSignals} new signal(s) since last run, ${r.assertions} behavior assertion(s) added, profile ${r.profileRefreshed ? "refreshed" : "unchanged"}, ${r.stylePruned} style signal(s) pruned.`);
       return;
     }
     case "profile": {
@@ -385,10 +386,13 @@ async function main(): Promise<void> {
         console.log("All data deleted.");
       } else if (args[0] === "--batch" && args[1]) {
         console.log(`Deleted ${store.forgetBatch(args[1])} events from batch ${args[1]}.`);
+      } else if (args[0] === "--style" && args[1] && args[2]) {
+        store.forgetStyle(args[1], args[2]);
+        console.log(`Forgot "${args[2]}" (${args[1]}) — won't be re-learned.`);
       } else if (args[0]) {
         console.log(`Deleted ${store.forgetTopic(args[0])} events for "${args[0]}".`);
       } else {
-        die("usage: persnallyd forget <topic> | --all | --batch <id>");
+        die("usage: persnallyd forget <topic> | --all | --batch <id> | --style <dimension> <pattern>");
       }
       store.close();
       return;
