@@ -8,6 +8,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
+import type { EventStore } from "../store.js";
 import { extractEvents, type ImportResult, type ParsedConversation, type ParsedExport } from "./extract.js";
 
 export const DEFAULT_TRANSCRIPTS_DIR = join(homedir(), ".claude", "projects");
@@ -104,4 +105,43 @@ export async function extractClaudeCodeEvents(
   file = DEFAULT_TRANSCRIPTS_DIR,
 ): Promise<ImportResult> {
   return extractEvents(parsed, { source: "import:claude-code", importer: "claude-code", file }, extract, model);
+}
+
+export interface IncrementalImport {
+  newSessions: number;
+  events: number;
+  skipped: number; // sessions already in the store
+}
+
+/**
+ * Import only the Claude Code sessions not already in the store — the path the
+ * daemon runs on its loop so new chats accrue without re-extracting old ones.
+ * Sessions are matched by the conversation_uuid recorded in each topic's
+ * provenance; a session that yields zero topics leaves no marker and may be
+ * retried, which is cheap and rare (a real session produces topics).
+ */
+export async function importNewClaudeCodeSessions(
+  store: EventStore,
+  extract: LlmExtract,
+  model = DEFAULT_EXTRACT_MODEL,
+  root: string = DEFAULT_TRANSCRIPTS_DIR,
+): Promise<IncrementalImport> {
+  if (!existsSync(root)) return { newSessions: 0, events: 0, skipped: 0 };
+  const { parsed } = parseClaudeCodeTranscripts(root);
+  const seen = importedConversationUuids(store);
+  const fresh = parsed.conversations.filter((c) => !seen.has(c.uuid));
+  const skipped = parsed.conversations.length - fresh.length;
+  if (!fresh.length) return { newSessions: 0, events: 0, skipped };
+  const { events } = await extractClaudeCodeEvents({ ...parsed, conversations: fresh }, extract, model, root);
+  store.append(events);
+  return { newSessions: fresh.length, events: events.length, skipped };
+}
+
+function importedConversationUuids(store: EventStore): Set<string> {
+  const uuids = new Set<string>();
+  for (const e of store.query({ source: "import:claude-code", limit: 1_000_000 })) {
+    const uuid = (e.provenance as { conversation_uuid?: string }).conversation_uuid;
+    if (uuid) uuids.add(uuid);
+  }
+  return uuids;
 }
