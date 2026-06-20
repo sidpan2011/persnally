@@ -2,6 +2,11 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.3.1] - 2026-06-20
+
+### Fixed
+- SessionStart hook now instructs Claude to call `persnally_track` at end-of-session — fixes 0% live capture rate where the model had context injected but no prompt to track signals back.
+
 ## [2.3.0] - 2026-06-21
 
 > Note: `2.2.0` was published to npm but its release commit (version bump + this
