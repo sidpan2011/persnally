@@ -47,6 +47,24 @@ test("empty or missing search dir yields nothing", () => {
   assert.deepEqual(detectExports(join(dir, "does-not-exist")), []);
 });
 
+test("a corrupt zip is skipped, not crashed on, and the failure is surfaced (not silently swallowed)", () => {
+  const corruptDir = mkdtempSync(join(tmpdir(), "setup-corrupt-"));
+  try {
+    writeFileSync(join(corruptDir, "corrupt.zip"), "this is not a real zip file");
+    const original = console.error;
+    const logged: string[] = [];
+    console.error = (...args: unknown[]) => logged.push(args.join(" "));
+    try {
+      assert.deepEqual(detectExports(corruptDir), [], "corrupt zip excluded, not crashed on");
+    } finally {
+      console.error = original;
+    }
+    assert.ok(logged.some((l) => l.includes("corrupt.zip")), "the read failure is surfaced, not silently swallowed");
+  } finally {
+    rmSync(corruptDir, { recursive: true, force: true });
+  }
+});
+
 // ── density floor ──
 
 test("isThin thresholds", async () => {
