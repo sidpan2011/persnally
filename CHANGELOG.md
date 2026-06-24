@@ -2,6 +2,11 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.5.0] - 2026-06-25
+
+### Added
+- **Retention pulse.** `persnallyd activity`, a `GET /activity` endpoint, and a dashboard engagement strip surface context-read activity over time: reads this week/month, distinct active days, a 14-day sparkline, and a week-2 retention verdict (≥1 read in days 8–14 after onboarding). Local/per-install only — it makes the otherwise-invisible "your AIs keep reading you" value visible, and it's the signal to watch on a fresh install or cold demo. Aggregate cross-user retention would require opt-in telemetry (deliberately not added).
+
 ## [2.4.0] - 2026-06-25
 
 ### Added
