@@ -55,13 +55,14 @@
   /* ── delta strip ── */
   .delta {
     background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
-    padding: 14px 18px; margin-bottom: 32px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 14px 18px; margin-bottom: 32px; display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
   }
-  .delta .lead { font-size: 11px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
-  .delta .items { display: flex; gap: 22px; flex-wrap: wrap; flex: 1; }
-  .delta .di { font-size: 14px; color: var(--dim); }
+  .delta .lead { font-size: 11px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--dim); }
+  .delta .items { font-size: 14px; line-height: 1.7; color: var(--dim); }
+  .delta .di { color: var(--dim); }
   .delta .di b { color: var(--text); font-weight: 600; }
   .delta .di .arr { color: var(--text); font-weight: 700; }
+  .delta .sep { color: var(--faint); }
 
   /* ── hero ── */
   .hero { margin-bottom: 8px; }
@@ -327,7 +328,7 @@ function renderDelta(topics, reads, assertions) {
   const na = assertions.filter(a => a.ts > now).length;
   if (na) items.push(`<span class="di"><b>${na}</b> new ${na>1?"patterns":"pattern"} noticed</span>`);
   if (!items.length) { el.className = "delta reveal"; el.innerHTML = `<span class="lead">all caught up</span><div class="items"><span class="di">steady since ${timeAgo(now)} — the engine keeps it current while you work.</span></div>`; return; }
-  el.className = "delta reveal"; el.innerHTML = `<span class="lead">since you last looked</span><div class="items">${items.join("")}</div>`;
+  el.className = "delta reveal"; el.innerHTML = `<span class="lead">since you last looked</span><div class="items">${items.join(' <span class="sep">·</span> ')}</div>`;
 }
 function saveSnapshot(topics) { const w = {}; topics.forEach(t => w[t.topic_key]=t.weight); localStorage.setItem(SNAP_KEY, JSON.stringify({ t:new Date().toISOString(), weights:w })); }
 
