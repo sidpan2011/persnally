@@ -37,7 +37,7 @@ cd web && npm install && npm run dev
 persnallyd/   # the product + the published npm package (`persnally`):
               #   SQLite event store, extractors, importers, daemon, dashboard, MCP adapter
 web/          # marketing site (Next.js -> Vercel)
-docs/         # EVENT_SCHEMA.md, ARCHITECTURE.md
+docs/         # EVENT_SCHEMA.md, ARCHITECTURE.md, CONTEXT_DEPTH.md
 experiments/  # Phase-0 validation scripts (standalone)
 ```
 
@@ -55,7 +55,7 @@ experiments/  # Phase-0 validation scripts (standalone)
 - Comments only where code can't speak — a constraint, an invariant, a non-obvious *why*. Never narrate what the code does.
 - Errors handled deliberately — no silent `catch`.
 
-See [`CLAUDE.md`](./CLAUDE.md) for the full engineering bar.
+The bar: minimal and simple over clever, prod-ready from the first commit, deliberate error handling (no silent swallowing), and a clean `npm test` + strict `tsc --noEmit` before every PR.
 
 ## Reporting bugs / requesting features
 
