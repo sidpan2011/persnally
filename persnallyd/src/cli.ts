@@ -23,7 +23,7 @@ import {
 import { gitEvents, scanRepos } from "./importers/git.js";
 import { freshConversations, type ParsedExport } from "./importers/extract.js";
 import {
-  autostartInstalled, installAutostart, LOG_FILE, removeAutostart,
+  autostartInstalled, installAutostart, LOG_FILE, reloadAutostart, removeAutostart,
   removePidFile, runningPid, startDetached, stopDaemon, writePidFile,
 } from "./lifecycle.js";
 import { newEvent } from "./events.js";
@@ -57,6 +57,7 @@ Usage:
   persnallyd activity               Context-read engagement over time (retention pulse)
   persnallyd start [--port N]       Start the daemon in the background
   persnallyd stop                   Stop the background daemon
+  persnallyd restart                Restart the daemon (correctly handles autostart/launchd)
   persnallyd serve [--port N]       Run the daemon in the foreground (127.0.0.1:${DEFAULT_PORT})
   persnallyd autostart [--remove]   Start the daemon at login and keep it alive (macOS)
   persnallyd config set-key <key>   Store the Anthropic API key (owner-only file) for the daemon
@@ -181,10 +182,8 @@ async function main(): Promise<void> {
         catch (e) { console.error(`· Context hook skipped: ${e instanceof Error ? e.message : e}`); }
       }
 
-      console.log(`\nDone${imported ? ` — ${imported} events imported` : ""}. Dashboard: http://127.0.0.1:${port}`);
-      if (process.platform === "darwin" && process.stdout.isTTY) {
-        try { execFileSync("open", [`http://127.0.0.1:${port}`]); } catch { /* non-fatal */ }
-      }
+      console.log(`\nDone${imported ? ` — ${imported} events imported` : ""}.`);
+      announceDashboard(port);
       return;
     }
     case "scope": {
@@ -470,17 +469,39 @@ async function main(): Promise<void> {
     case "start": {
       const existing = runningPid();
       if (existing) return die(`daemon already running (pid ${existing})`);
-      const pid = await startDetached(process.argv[1]!, parsePort(args));
-      console.log(`persnallyd started (pid ${pid}). Dashboard: http://127.0.0.1:${parsePort(args)}`);
+      const port = parsePort(args);
+      const pid = await startDetached(process.argv[1]!, port);
+      console.log(`persnallyd started (pid ${pid}).`);
+      announceDashboard(port);
       console.log(`Logs: ${LOG_FILE}`);
       return;
     }
     case "stop": {
       if (autostartInstalled()) {
-        console.error("Note: autostart is installed — launchd will restart the daemon. Use `persnallyd autostart --remove` to stop it permanently.");
+        console.error("Note: autostart is installed — launchd will respawn the daemon. To restart cleanly use `persnallyd restart`; to stop it for good use `persnallyd autostart --remove`.");
       }
       const pid = await stopDaemon();
       console.log(pid ? `Stopped daemon (pid ${pid}).` : "Daemon was not running.");
+      return;
+    }
+    case "restart": {
+      const port = parsePort(args);
+      if (autostartInstalled()) {
+        // launchd owns the lifecycle — a plain stop just gets respawned. Reload the
+        // job so it comes back on the current install (also heals a drifted plist path).
+        const health = await reloadAutostart(process.argv[1]!, port);
+        if (health) {
+          console.log(`Restarted via launchd — daemon up on v${health.version}.`);
+          announceDashboard(port);
+        } else {
+          console.log("Reloaded autostart; daemon is still coming up — check: persnallyd status");
+        }
+      } else {
+        await stopDaemon();
+        const pid = await startDetached(process.argv[1]!, port);
+        console.log(`persnallyd restarted (pid ${pid}).`);
+        announceDashboard(port);
+      }
       return;
     }
     case "autostart": {
@@ -493,6 +514,7 @@ async function main(): Promise<void> {
       if (stopped) console.log(`Stopped existing daemon (pid ${stopped}) — launchd takes over.`);
       const plist = installAutostart(process.argv[1]!, parsePort(args));
       console.log(`Autostart installed (${plist}). The daemon now runs at login and restarts if it exits.`);
+      announceDashboard(parsePort(args), false); // launchd brings it up async — show the link, don't open a not-yet-ready page
       return;
     }
     case "serve": {
@@ -539,6 +561,15 @@ function sparkline(values: number[]): string {
 function summarize(payload: Record<string, unknown>): string {
   const s = JSON.stringify(payload);
   return s.length > 80 ? s.slice(0, 77) + "..." : s;
+}
+
+/** Print the dashboard URL and, when run interactively on macOS, open it. */
+function announceDashboard(port: number, open = true): void {
+  const url = `http://127.0.0.1:${port}`;
+  console.log(`Dashboard: ${url}`);
+  if (open && process.platform === "darwin" && process.stdout.isTTY) {
+    try { execFileSync("open", [url]); } catch { /* non-fatal — the link is printed above */ }
+  }
 }
 
 function die(msg: string): void {

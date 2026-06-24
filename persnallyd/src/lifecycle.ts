@@ -112,6 +112,26 @@ export function removeAutostart(): boolean {
   return true;
 }
 
+/**
+ * Reload the launchd job so the daemon restarts on the currently-installed build.
+ * `unload` then `load` — a plain `load` can't replace an already-loaded job, which
+ * is how a plist path silently drifts from the running process. Rewriting from the
+ * caller's cliPath also heals that drift. Returns the new daemon's /health once it
+ * answers, or null if it didn't come up in time.
+ */
+export async function reloadAutostart(cliPath: string, port: number): Promise<{ version: string } | null> {
+  removeAutostart();
+  installAutostart(cliPath, port);
+  for (let i = 0; i < 30; i++) {
+    await sleep(100);
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/health`);
+      if (r.ok) return (await r.json()) as { version: string };
+    } catch { /* launchd hasn't brought it up yet */ }
+  }
+  return null;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
