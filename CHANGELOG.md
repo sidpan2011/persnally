@@ -2,6 +2,18 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.4.0] - 2026-06-25
+
+### Added
+- **Mobile dashboard.** The interest constellation is now fully touch-driven (single-finger drag, pinch-to-zoom, tap-to-inspect, via pointer events), the layout reflows for phones, and narrow screens open to the topic list with the map one tap away. The trust surface is now usable on the device most launch traffic arrives on — it was inert on touch before.
+- **Real provenance in the dashboard's "why?".** Each piece of evidence now names where it actually came from — the conversation it was imported from, the live client + session that recorded it, or the repo — instead of collapsing everything to a bare `mcp`/filename label.
+
+### Fixed
+- **Re-import is idempotent.** `persnallyd import claude|chatgpt|claude-code` now dedupes by conversation id and `import git` by repo, so re-running an import only adds genuinely new items instead of doubling every interest weight. (`setup` and the daemon auto-import were already safe; the explicit one-shot commands were not.)
+- **Large exports fail clearly, not catastrophically.** An import file over 400 MB is refused with an actionable message instead of an opaque out-of-memory crash during `readFileSync`/`JSON.parse`.
+- The dashboard footer now shows the running daemon version (was a permanently blank slot).
+- Docs: corrected stale `get_context`/`record_event` tool names to `persnally_context`/`persnally_track` in `ARCHITECTURE.md` and `CONTEXT_DEPTH.md`; the README importer diagram now lists `claude-code`.
+
 ## [2.3.2] - 2026-06-21
 
 ### Added
