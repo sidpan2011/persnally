@@ -134,3 +134,10 @@ web/.env.local
 persnallyd/README.md
 persnallyd/LICENSE
 .gstack/
+
+# Internal strategy docs — kept local, never published
+/CLAUDE.md
+/PIVOT.md
+/PROGRESS.md
+/docs/VISION.md
+/launch/
