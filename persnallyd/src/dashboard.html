@@ -153,6 +153,11 @@
   .read .what .l1 b { color: var(--text); } .read .what .l1 .p { color: var(--dim); }
   .read .what .l2 { font-size: 11px; color: var(--faint); margin-top: 2px; }
   .read .when { font-size: 11.5px; color: var(--dim); white-space: nowrap; }
+  .engage { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--dim); margin: 0 0 16px; }
+  .engage b { color: var(--text); font-weight: 600; }
+  .engage .spark { display: inline-flex; align-items: flex-end; gap: 2px; height: 22px; }
+  .engage .spark i { width: 6px; min-height: 2px; border-radius: 1px; display: inline-block; }
+  .engage .rk { color: var(--faint); }
 
   /* ── reflection ── */
   .refl { border-left: 2px solid var(--line-2); padding: 4px 0 4px 16px; margin-bottom: 16px; }
@@ -238,6 +243,7 @@
       <div class="value-num num" id="valueNum">0</div>
       <div class="value-cap" id="valueCap"></div>
     </div>
+    <div class="engage" id="engage"></div>
     <div class="card" id="reads" style="padding:6px 16px"></div>
   </section>
 
@@ -417,6 +423,22 @@ function renderReads(reads, total) {
   }).join("");
 }
 
+/* ── engagement (retention pulse) ── */
+function renderEngage(a) {
+  const el = $("engage");
+  if (!a || !a.firstEventAt || !a.daily) { el.innerHTML = ""; return; }
+  const max = Math.max(...a.daily.map((d) => d.reads), 1);
+  const bars = a.daily.map((d, i) => {
+    const today = i === a.daily.length - 1;
+    const h = d.reads ? Math.max(3, Math.round((d.reads / max) * 22)) : 2;
+    const c = d.reads ? (today ? "var(--text)" : "var(--dim)") : "var(--line-2)";
+    return `<i style="height:${h}px;background:${c}" title="${esc(d.date)}: ${d.reads}"></i>`;
+  }).join("");
+  const ret = a.retainedWeek2 === null ? `day ${a.daysSinceFirst}/14` : (a.retainedWeek2 ? "active ✓" : "inactive ✗");
+  el.innerHTML = `<span><b>${a.reads7d}</b> this week</span><span>active <b>${a.activeDays14d}</b> of last 14 days</span>` +
+    `<span class="spark" title="context reads, last 14 days">${bars}</span><span class="rk">week-2: ${esc(ret)}</span>`;
+}
+
 /* ── reflections ── */
 function renderReflections(assertions) {
   const behav = assertions.filter(a => a.payload && (a.payload.kind==="behavior" || a.payload.kind==="preference"));
@@ -594,16 +616,16 @@ $("vList").onclick = () => switchView("list");
 
 /* ── load ── */
 async function loadAll() {
-  let stats, profile, topics, reads, assertions, voice;
+  let stats, profile, topics, reads, assertions, voice, activity;
   try {
-    [stats, profile, topics, reads, assertions, voice] = await Promise.all([
+    [stats, profile, topics, reads, assertions, voice, activity] = await Promise.all([
       get("/stats"), get("/profile"), get("/topics?limit=40"),
-      get("/events?type=context.read&limit=60"), get("/events?type=signal.assertion&limit=20"), get("/voice"),
+      get("/events?type=context.read&limit=60"), get("/events?type=signal.assertion&limit=20"), get("/voice"), get("/activity"),
     ]);
     if (!stats) throw new Error("no daemon");
   } catch (e) {
     DEMO = true; $("ribbon").classList.add("show");
-    ({ stats, profile, topics, reads, assertions, voice } = DEMO_DATA());
+    ({ stats, profile, topics, reads, assertions, voice, activity } = DEMO_DATA());
   }
   topics = topics||[]; reads = reads||[]; assertions = assertions||[];
   const st = $("status");
@@ -618,6 +640,7 @@ async function loadAll() {
   renderTopicList(topics);
   renderMap(topics);
   renderReads(reads, total);
+  renderEngage(activity);
   renderReflections(assertions);
   saveSnapshot(topics);
 }
@@ -635,9 +658,10 @@ $("reflect").onclick = async () => {
 };
 setInterval(async () => {
   if (DEMO) return;
-  const [reads, stats, voice] = await Promise.all([get("/events?type=context.read&limit=60"), get("/stats"), get("/voice")]);
+  const [reads, stats, voice, activity] = await Promise.all([get("/events?type=context.read&limit=60"), get("/stats"), get("/voice"), get("/activity")]);
   if (reads && stats) renderReads(reads, (stats.byType && stats.byType["context.read"]) || reads.length);
   if (voice) renderVoice(voice); // live: voice signals captured mid-session show up without a reload
+  if (activity) renderEngage(activity);
 }, 25000);
 
 loadAll();
@@ -683,6 +707,7 @@ function DEMO_DATA() {
       { ts:iso(86400000*2), payload:{ claim:"You consistently choose local-first, auditable tools over cloud convenience.", kind:"preference", confidence:0.86 }, provenance:{ kind:"derived" } },
       { ts:iso(86400000*6), payload:{ claim:"You generate new ideas fastest right when your main bet stalls.", kind:"behavior", confidence:0.71 }, provenance:{ kind:"derived" } },
     ],
+    activity: { firstEventAt: iso(86400000*214), lastReadAt: iso(3600000*2), daysSinceFirst: 214, totalReads: 1247, reads7d: 33, reads30d: 142, activeDays7d: 5, activeDays14d: 12, retainedWeek2: true, daily: [2,0,3,5,1,4,6,2,0,3,7,5,8,4].map((r,i)=>({ date:new Date(now-(13-i)*86400000).toISOString().slice(0,10), reads:r })) },
     voice: {
       pack: "Write like this user: terse — short, declarative sentences; leads with imperatives, minimal preamble; states things flatly; no emoji; casual register (lowercases “i”); recurring phrasing: “be 100% sure”, “industry best practices”, “validate whether it's valid or not”.",
       items: [

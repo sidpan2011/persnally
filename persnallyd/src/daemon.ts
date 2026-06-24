@@ -46,6 +46,9 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
       if (req.method === "GET" && url.pathname === "/stats") {
         return json(res, 200, store.stats());
       }
+      if (req.method === "GET" && url.pathname === "/activity") {
+        return json(res, 200, store.activity());
+      }
       if (req.method === "GET" && url.pathname === "/topics") {
         const client = url.searchParams.get("client");
         const allowed = client ? allowedCategories(client) : null;

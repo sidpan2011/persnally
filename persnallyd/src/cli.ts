@@ -54,6 +54,7 @@ Usage:
   persnallyd forget --all           Delete all data
   persnallyd forget --batch <id>    Undo one import batch
   persnallyd status                 Store stats and daemon health
+  persnallyd activity               Context-read engagement over time (retention pulse)
   persnallyd start [--port N]       Start the daemon in the background
   persnallyd stop                   Stop the background daemon
   persnallyd serve [--port N]       Run the daemon in the foreground (127.0.0.1:${DEFAULT_PORT})
@@ -453,6 +454,19 @@ async function main(): Promise<void> {
       console.log(`Autostart: ${autostartInstalled() ? "installed" : "not installed"}`);
       return;
     }
+    case "activity": {
+      const store = new EventStore();
+      const a = store.activity();
+      store.close();
+      if (!a.firstEventAt) { console.log("No activity yet — run an import or connect a client."); return; }
+      const verdict = a.retainedWeek2 === null ? `in progress (day ${a.daysSinceFirst}/14)` : a.retainedWeek2 ? "active ✓" : "inactive ✗";
+      console.log(`Onboarded ${a.daysSinceFirst}d ago · ${a.totalReads} context read(s) total`);
+      console.log(`Reads: ${a.reads7d} this week · ${a.reads30d} this month`);
+      console.log(`Active: ${a.activeDays7d}/7 days · ${a.activeDays14d}/14 days`);
+      console.log(`Week-2 retention: ${verdict}`);
+      console.log(`Last 14 days: ${sparkline(a.daily.map((d) => d.reads))}`);
+      return;
+    }
     case "start": {
       const existing = runningPid();
       if (existing) return die(`daemon already running (pid ${existing})`);
@@ -514,6 +528,12 @@ async function main(): Promise<void> {
       console.log(USAGE);
       process.exitCode = cmd ? 1 : 0;
   }
+}
+
+function sparkline(values: number[]): string {
+  const blocks = "▁▂▃▄▅▆▇█";
+  const max = Math.max(...values, 1);
+  return values.map((v) => (v === 0 ? "·" : blocks[Math.min(blocks.length - 1, Math.floor((v / max) * (blocks.length - 1)))])).join("");
 }
 
 function summarize(payload: Record<string, unknown>): string {

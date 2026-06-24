@@ -44,6 +44,19 @@ export interface StoredProfile {
   model: string;
 }
 
+export interface Activity {
+  firstEventAt: string | null;   // onboarding proxy: first event of any kind
+  lastReadAt: string | null;
+  daysSinceFirst: number;
+  totalReads: number;
+  reads7d: number;
+  reads30d: number;
+  activeDays7d: number;          // distinct days with ≥1 context.read
+  activeDays14d: number;
+  retainedWeek2: boolean | null; // ≥1 read in days 8–14 after onboarding; null until that window has fully elapsed
+  daily: { date: string; reads: number }[]; // last 14 days, oldest→newest
+}
+
 export class EventStore {
   private db: Database.Database;
 
@@ -179,6 +192,48 @@ export class EventStore {
       );
     const span = this.db.prepare("SELECT MIN(ts) first, MAX(ts) last FROM events").get() as { first: string | null; last: string | null };
     return { total, byType: group("type"), bySource: group("source"), ...span };
+  }
+
+  /**
+   * Engagement over time from context.read events — the retention pulse.
+   * Local/per-install only (this machine); aggregate cohort retention would
+   * require opt-in telemetry. `now` is injectable for deterministic tests.
+   */
+  activity(now: number = Date.now()): Activity {
+    const DAY = 86_400_000;
+    const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+    const reads = this.query({ type: "context.read", limit: 1_000_000 }); // ts DESC
+    const firstEventAt = (this.db.prepare("SELECT MIN(ts) m FROM events").get() as { m: string | null }).m;
+    const firstMs = firstEventAt ? new Date(firstEventAt).getTime() : null;
+
+    const daily = new Map<string, number>();
+    for (let i = 13; i >= 0; i--) daily.set(dayKey(now - i * DAY), 0);
+
+    let reads7d = 0, reads30d = 0, week2Read = false;
+    const days7 = new Set<string>(), days14 = new Set<string>();
+    for (const e of reads) {
+      const t = new Date(e.ts).getTime();
+      if (!Number.isFinite(t)) continue;
+      const age = now - t, k = dayKey(t);
+      if (age <= 7 * DAY) { reads7d++; days7.add(k); }
+      if (age <= 14 * DAY) days14.add(k);
+      if (age <= 30 * DAY) reads30d++;
+      if (daily.has(k)) daily.set(k, (daily.get(k) ?? 0) + 1);
+      if (firstMs !== null && t >= firstMs + 7 * DAY && t < firstMs + 14 * DAY) week2Read = true;
+    }
+
+    return {
+      firstEventAt,
+      lastReadAt: reads.length ? reads[0]!.ts : null,
+      daysSinceFirst: firstMs !== null ? Math.max(0, Math.floor((now - firstMs) / DAY)) : 0,
+      totalReads: reads.length,
+      reads7d,
+      reads30d,
+      activeDays7d: days7.size,
+      activeDays14d: days14.size,
+      retainedWeek2: firstMs !== null && now >= firstMs + 14 * DAY ? week2Read : null,
+      daily: [...daily.entries()].map(([date, r]) => ({ date, reads: r })),
+    };
   }
 
   topics(limit = 50): TopicRow[] {
