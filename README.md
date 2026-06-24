@@ -93,14 +93,16 @@ persnallyd import claude|claude-code|chatgpt|git <path>
 persnallyd scope <client> <categories>   # limit what a client can read
 persnallyd profile                       # synthesize the profile
 persnallyd consolidate                   # reflect now: refresh decay, add behavior patterns
+persnallyd voice                         # refresh your "how you write" fingerprint (offline)
 persnallyd show [topics|events|profile]
-persnallyd forget <topic> | --all | --batch <id>
+persnallyd activity                      # context-read engagement over time (retention pulse)
+persnallyd forget <topic> | --all | --batch <id> | --style <dim> <pattern>
 persnallyd config set-key <sk-ant-…>     # key for the background daemon
 ```
 
 ## Status
 
-Early and moving fast — see [ROADMAP.md](./ROADMAP.md). Today: import from Claude, ChatGPT, Claude Code, and git; a decay-weighted interest graph; an evidence-linked profile; a local dashboard; per-client permission scoping; nightly consolidation; and the MCP layer that serves it all. Next: cross-tool context everywhere, then a behavior model that can answer *what would I do here?*
+Early and moving fast — see [ROADMAP.md](./ROADMAP.md). Today: import from Claude, ChatGPT, Claude Code, and git; a decay-weighted interest graph; an evidence-linked profile; a voice & convention layer so connected tools answer the way you write; a local dashboard with full provenance and one-click deletion; per-client permission scoping; nightly consolidation; and the MCP layer that serves it all. Next: cross-tool context everywhere, then a behavior model that can answer *what would I do here?*
 
 ## License
 
