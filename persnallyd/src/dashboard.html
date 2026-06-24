@@ -434,7 +434,7 @@ function renderEngage(a) {
     const c = d.reads ? (today ? "var(--text)" : "var(--dim)") : "var(--line-2)";
     return `<i style="height:${h}px;background:${c}" title="${esc(d.date)}: ${d.reads}"></i>`;
   }).join("");
-  const ret = a.retainedWeek2 === null ? `day ${a.daysSinceFirst}/14` : (a.retainedWeek2 ? "active ✓" : "inactive ✗");
+  const ret = a.retainedWeek2 === null ? `day ${a.daysSinceFirstRead}/14` : (a.retainedWeek2 ? "active ✓" : "inactive ✗");
   el.innerHTML = `<span><b>${a.reads7d}</b> this week</span><span>active <b>${a.activeDays14d}</b> of last 14 days</span>` +
     `<span class="spark" title="context reads, last 14 days">${bars}</span><span class="rk">week-2: ${esc(ret)}</span>`;
 }
@@ -707,7 +707,7 @@ function DEMO_DATA() {
       { ts:iso(86400000*2), payload:{ claim:"You consistently choose local-first, auditable tools over cloud convenience.", kind:"preference", confidence:0.86 }, provenance:{ kind:"derived" } },
       { ts:iso(86400000*6), payload:{ claim:"You generate new ideas fastest right when your main bet stalls.", kind:"behavior", confidence:0.71 }, provenance:{ kind:"derived" } },
     ],
-    activity: { firstEventAt: iso(86400000*214), lastReadAt: iso(3600000*2), daysSinceFirst: 214, totalReads: 1247, reads7d: 33, reads30d: 142, activeDays7d: 5, activeDays14d: 12, retainedWeek2: true, daily: [2,0,3,5,1,4,6,2,0,3,7,5,8,4].map((r,i)=>({ date:new Date(now-(13-i)*86400000).toISOString().slice(0,10), reads:r })) },
+    activity: { firstEventAt: iso(86400000*214), firstReadAt: iso(86400000*210), lastReadAt: iso(3600000*2), daysSinceFirst: 214, daysSinceFirstRead: 210, totalReads: 1247, reads7d: 33, reads30d: 142, activeDays7d: 5, activeDays14d: 12, retainedWeek2: true, daily: [2,0,3,5,1,4,6,2,0,3,7,5,8,4].map((r,i)=>({ date:new Date(now-(13-i)*86400000).toISOString().slice(0,10), reads:r })) },
     voice: {
       pack: "Write like this user: terse — short, declarative sentences; leads with imperatives, minimal preamble; states things flatly; no emoji; casual register (lowercases “i”); recurring phrasing: “be 100% sure”, “industry best practices”, “validate whether it's valid or not”.",
       items: [

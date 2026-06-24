@@ -459,7 +459,7 @@ async function main(): Promise<void> {
       const a = store.activity();
       store.close();
       if (!a.firstEventAt) { console.log("No activity yet — run an import or connect a client."); return; }
-      const verdict = a.retainedWeek2 === null ? `in progress (day ${a.daysSinceFirst}/14)` : a.retainedWeek2 ? "active ✓" : "inactive ✗";
+      const verdict = a.retainedWeek2 === null ? `in progress (day ${a.daysSinceFirstRead}/14 of reads)` : a.retainedWeek2 ? "active ✓" : "inactive ✗";
       console.log(`Onboarded ${a.daysSinceFirst}d ago · ${a.totalReads} context read(s) total`);
       console.log(`Reads: ${a.reads7d} this week · ${a.reads30d} this month`);
       console.log(`Active: ${a.activeDays7d}/7 days · ${a.activeDays14d}/14 days`);

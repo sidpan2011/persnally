@@ -45,15 +45,17 @@ export interface StoredProfile {
 }
 
 export interface Activity {
-  firstEventAt: string | null;   // onboarding proxy: first event of any kind
+  firstEventAt: string | null;     // onboarding proxy: first event of any kind
+  firstReadAt: string | null;      // when context-serving actually began (first context.read)
   lastReadAt: string | null;
-  daysSinceFirst: number;
+  daysSinceFirst: number;          // since onboarding
+  daysSinceFirstRead: number;      // since serving began — the retention clock
   totalReads: number;
   reads7d: number;
   reads30d: number;
-  activeDays7d: number;          // distinct days with ≥1 context.read
+  activeDays7d: number;            // distinct days with ≥1 context.read
   activeDays14d: number;
-  retainedWeek2: boolean | null; // ≥1 read in days 8–14 after onboarding; null until that window has fully elapsed
+  retainedWeek2: boolean | null;   // ≥1 read in days 8–14 after the FIRST read; null until that window has fully elapsed
   daily: { date: string; reads: number }[]; // last 14 days, oldest→newest
 }
 
@@ -205,6 +207,11 @@ export class EventStore {
     const reads = this.query({ type: "context.read", limit: 1_000_000 }); // ts DESC
     const firstEventAt = (this.db.prepare("SELECT MIN(ts) m FROM events").get() as { m: string | null }).m;
     const firstMs = firstEventAt ? new Date(firstEventAt).getTime() : null;
+    // Retention is anchored to when serving actually began (the first read), not
+    // onboarding — so a gap between setup and the first read can't read as a
+    // false "not retained". For a fresh install the two are minutes apart.
+    const firstReadAt = reads.length ? reads[reads.length - 1]!.ts : null;
+    const firstReadMs = firstReadAt ? new Date(firstReadAt).getTime() : null;
 
     const daily = new Map<string, number>();
     for (let i = 13; i >= 0; i--) daily.set(dayKey(now - i * DAY), 0);
@@ -219,19 +226,21 @@ export class EventStore {
       if (age <= 14 * DAY) days14.add(k);
       if (age <= 30 * DAY) reads30d++;
       if (daily.has(k)) daily.set(k, (daily.get(k) ?? 0) + 1);
-      if (firstMs !== null && t >= firstMs + 7 * DAY && t < firstMs + 14 * DAY) week2Read = true;
+      if (firstReadMs !== null && t >= firstReadMs + 7 * DAY && t < firstReadMs + 14 * DAY) week2Read = true;
     }
 
     return {
       firstEventAt,
+      firstReadAt,
       lastReadAt: reads.length ? reads[0]!.ts : null,
       daysSinceFirst: firstMs !== null ? Math.max(0, Math.floor((now - firstMs) / DAY)) : 0,
+      daysSinceFirstRead: firstReadMs !== null ? Math.max(0, Math.floor((now - firstReadMs) / DAY)) : 0,
       totalReads: reads.length,
       reads7d,
       reads30d,
       activeDays7d: days7.size,
       activeDays14d: days14.size,
-      retainedWeek2: firstMs !== null && now >= firstMs + 14 * DAY ? week2Read : null,
+      retainedWeek2: firstReadMs !== null && now >= firstReadMs + 14 * DAY ? week2Read : null,
       daily: [...daily.entries()].map(([date, r]) => ({ date, reads: r })),
     };
   }
