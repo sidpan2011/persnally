@@ -20,7 +20,7 @@ every trust argument. Boring technology, radical properties.
 
 ```
   AI clients (Claude, Cursor, agents...)        importers (claude, chatgpt, git...)
-        │  MCP: get_context / record_event            │  parse (pure) → extract (LLM) → events
+        │  MCP: persnally_context / persnally_track   │  parse (pure) → extract (LLM) → events
         ▼                                              ▼
   ┌─────────────────────────── persnallyd ─────────────────────────────┐
   │   EVENT LOG (SQLite/WAL) ──── the only source of truth             │
@@ -56,7 +56,7 @@ every trust argument. Boring technology, radical properties.
 
 ## How it learns (agentic / RAG / feedback / "daily training")
 
-- **Agents consume us; the core is not agentic.** We serve agents (`get_context`,
+- **Agents consume us; the core is not agentic.** We serve agents (`persnally_context`,
   Phase 3 `ask_user_model`); we use bounded LLM passes at the edges; reads never think.
 - **RAG: we are the R.** From every client's perspective Persnally is the retrieval layer
   for the user. Structured retrieval (weights, kinds, time) is built; embeddings arrive as

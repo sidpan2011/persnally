@@ -6,13 +6,13 @@
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
-import { extractEvents, type ImportResult, type ParsedConversation, type ParsedExport } from "./extract.js";
+import { extractEvents, readImportFile, type ImportResult, type ParsedConversation, type ParsedExport } from "./extract.js";
 
 export function parseClaudeExport(dir: string): ParsedExport {
   const convPath = join(dir, "conversations.json");
   if (!existsSync(convPath)) throw new Error(`No conversations.json in ${dir}`);
 
-  const raw = JSON.parse(readFileSync(convPath, "utf-8")) as Array<Record<string, unknown>>;
+  const raw = JSON.parse(readImportFile(convPath)) as Array<Record<string, unknown>>;
   const conversations: ParsedConversation[] = raw.map((c) => ({
     uuid: String(c.uuid ?? ""),
     name: String(c.name ?? ""),

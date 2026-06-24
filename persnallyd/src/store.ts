@@ -150,6 +150,26 @@ export class EventStore {
       .map(rowToEvent);
   }
 
+  /** conversation_uuids already imported from a source — lets a re-import top up only new chats, never double. */
+  importedConversationUuids(source: string): Set<string> {
+    const uuids = new Set<string>();
+    for (const e of this.query({ source, limit: 1_000_000 })) {
+      const uuid = (e.provenance as { conversation_uuid?: string }).conversation_uuid;
+      if (uuid) uuids.add(uuid);
+    }
+    return uuids;
+  }
+
+  /** repo names already imported via `import git` — lets a re-import skip repos already on file. */
+  importedGitRepos(): Set<string> {
+    const repos = new Set<string>();
+    for (const e of this.query({ source: "import:git", limit: 1_000_000 })) {
+      const repo = (e.provenance as { repo?: string }).repo;
+      if (repo) repos.add(repo);
+    }
+    return repos;
+  }
+
   stats(): { total: number; byType: Record<string, number>; bySource: Record<string, number>; first: string | null; last: string | null } {
     const total = (this.db.prepare("SELECT COUNT(*) n FROM events").get() as { n: number }).n;
     const group = (col: string) =>

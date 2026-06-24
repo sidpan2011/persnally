@@ -7,7 +7,7 @@
 Three failure modes to avoid:
 1. **Spam** — storing every micro-observation forever → noise, no signal. → store granular evidence, but consolidate to a *small set of stable constants*; decay fades old habits; corrections override.
 2. **Descriptive-not-prescriptive** — "interested in Rust" doesn't change output. → every served line is an *instruction for the AI about the user*, not biography.
-3. **Capture without serving** — fingerprinting is pointless unless a tool consumes it. → the loop closes only at the `get_context` voice/convention packs.
+3. **Capture without serving** — fingerprinting is pointless unless a tool consumes it. → the loop closes only at the `persnally_context` voice/convention packs.
 
 ## Schema — `signal.style`
 
@@ -58,7 +58,7 @@ The nightly pass (`consolidate.ts`) already exists. Extend it to:
 
 ## Serving — prescriptive packs
 
-New `get_context` scopes, system-prompt-ready:
+New `persnally_context` scopes, system-prompt-ready:
 
 - **voice** → *"Write like this user: terse, no emoji, bullets over prose, no filler, direct imperatives, rarely hedges, says 'and so on' / 'doesn't make sense'."*
 - **conventions** → *"Their rules: TypeScript · SQLite · pnpm · vitest · no default exports · small commits · wants the falsification first · minimal beats clever."*

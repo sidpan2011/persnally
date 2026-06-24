@@ -128,20 +128,11 @@ export async function importNewClaudeCodeSessions(
 ): Promise<IncrementalImport> {
   if (!existsSync(root)) return { newSessions: 0, events: 0, skipped: 0 };
   const { parsed } = parseClaudeCodeTranscripts(root);
-  const seen = importedConversationUuids(store);
+  const seen = store.importedConversationUuids("import:claude-code");
   const fresh = parsed.conversations.filter((c) => !seen.has(c.uuid));
   const skipped = parsed.conversations.length - fresh.length;
   if (!fresh.length) return { newSessions: 0, events: 0, skipped };
   const { events } = await extractClaudeCodeEvents({ ...parsed, conversations: fresh }, extract, model, root);
   store.append(events);
   return { newSessions: fresh.length, events: events.length, skipped };
-}
-
-function importedConversationUuids(store: EventStore): Set<string> {
-  const uuids = new Set<string>();
-  for (const e of store.query({ source: "import:claude-code", limit: 1_000_000 })) {
-    const uuid = (e.provenance as { conversation_uuid?: string }).conversation_uuid;
-    if (uuid) uuids.add(uuid);
-  }
-  return uuids;
 }

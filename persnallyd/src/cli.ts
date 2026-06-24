@@ -21,6 +21,7 @@ import {
   DEFAULT_TRANSCRIPTS_DIR, extractClaudeCodeEvents, parseClaudeCodeTranscripts,
 } from "./importers/claude-code.js";
 import { gitEvents, scanRepos } from "./importers/git.js";
+import { freshConversations, type ParsedExport } from "./importers/extract.js";
 import {
   autostartInstalled, installAutostart, LOG_FILE, removeAutostart,
   removePidFile, runningPid, startDetached, stopDaemon, writePidFile,
@@ -247,41 +248,75 @@ async function main(): Promise<void> {
       const usage = "usage: persnallyd import claude|claude-code|chatgpt|git <path>";
       if (!kind) return die(usage);
 
-      let events, batch;
-      if (kind === "claude-code") {
-        const engine = await chooseExtractor("extract");
-        const root = path ?? DEFAULT_TRANSCRIPTS_DIR;
-        const { parsed, sessionsFound, sessionsDropped } = parseClaudeCodeTranscripts(root);
-        if (!parsed.conversations.length) return die(`No usable sessions found at ${root}`);
-        console.error(
-          `Found ${sessionsFound} session(s)${sessionsDropped ? ` — importing the ${parsed.conversations.length} most recent` : ""}. ` +
-          `Extracting with ${engine.label}...`,
-        );
-        ({ events, batch } = await extractClaudeCodeEvents(parsed, engine.extract, engine.model, root));
-      } else if (!path) {
-        return die(usage);
-      } else if (kind === "git") {
+      // Git: offline, deterministic. Dedup by repo so a re-run never doubles the graph.
+      if (kind === "git") {
+        if (!path) return die(usage);
         const authorIdx = args.indexOf("--author");
         const summaries = scanRepos(path, authorIdx > -1 ? args[authorIdx + 1] : undefined);
         if (!summaries.length) return die(`No git repos with your commits found at ${path}`);
-        console.error(`Found ${summaries.length} repo(s): ${summaries.map((s) => `${s.repo} (${s.commits} commits)`).join(", ")}`);
-        ({ events, batch } = gitEvents(summaries));
-      } else if (kind === "claude" || kind === "chatgpt") {
-        const engine = await chooseExtractor("extract");
-        const parsed = kind === "claude" ? parseClaudeExport(path) : parseChatGPTExport(path);
-        console.error(`Parsed ${parsed.conversations.length} conversations. Extracting with ${engine.label}...`);
-        ({ events, batch } = kind === "claude"
-          ? await extractClaudeEvents(parsed, engine.extract, engine.model)
-          : await extractChatGPTEvents(parsed, engine.extract, engine.model));
+        const store = new EventStore();
+        const seen = store.importedGitRepos();
+        const fresh = summaries.filter((s) => !seen.has(s.repo));
+        const skipped = summaries.length - fresh.length;
+        if (!fresh.length) {
+          store.close();
+          console.log(`All ${summaries.length} repo(s) already imported — nothing new.`);
+          return;
+        }
+        console.error(`Found ${summaries.length} repo(s)${skipped ? ` (${skipped} already imported)` : ""} — importing ${fresh.map((s) => `${s.repo} (${s.commits} commits)`).join(", ")}`);
+        const { events, batch } = gitEvents(fresh);
+        store.append(events);
+        store.rebuild();
+        store.close();
+        console.log(`Imported ${events.length} events from ${fresh.length} repo(s) (batch ${batch}).`);
+        console.log(`Undo with: persnallyd forget --batch ${batch}`);
+        return;
+      }
+
+      // Conversation imports: dedup by conversation_uuid so re-import only adds new chats.
+      let parsed: ParsedExport;
+      let file = "conversations.json";
+      let parseNote = "";
+      if (kind === "claude-code") {
+        const root = path ?? DEFAULT_TRANSCRIPTS_DIR;
+        file = root;
+        const r = parseClaudeCodeTranscripts(root);
+        if (!r.parsed.conversations.length) return die(`No usable sessions found at ${root}`);
+        parsed = r.parsed;
+        if (r.sessionsDropped) parseNote = ` (most recent ${r.parsed.conversations.length} of ${r.sessionsFound})`;
+      } else if (kind === "claude") {
+        if (!path) return die(usage);
+        parsed = parseClaudeExport(path);
+      } else if (kind === "chatgpt") {
+        if (!path) return die(usage);
+        parsed = parseChatGPTExport(path);
       } else {
         return die(`unknown import source "${kind}" — use claude, claude-code, chatgpt, or git`);
       }
 
       const store = new EventStore();
+      const seen = store.importedConversationUuids(`import:${kind}`);
+      const { parsed: toExtract, skipped, firstImport } = freshConversations(parsed, seen);
+      if (!toExtract.conversations.length && !firstImport) {
+        store.close();
+        console.log(`Already up to date — all ${parsed.conversations.length} conversation(s) imported. Nothing new.`);
+        return;
+      }
+
+      const engine = await chooseExtractor("extract");
+      console.error(
+        `Parsed ${parsed.conversations.length} conversation(s)${parseNote}${skipped ? ` — ${skipped} already imported` : ""}. ` +
+        `Extracting ${toExtract.conversations.length} with ${engine.label}...`,
+      );
+      const { events, batch } = await (
+        kind === "claude-code" ? extractClaudeCodeEvents(toExtract, engine.extract, engine.model, file)
+        : kind === "claude" ? extractClaudeEvents(toExtract, engine.extract, engine.model)
+        : extractChatGPTEvents(toExtract, engine.extract, engine.model)
+      );
       store.append(events);
       store.rebuild();
       store.close();
-      console.log(`Imported ${events.length} events (batch ${batch}).`);
+      console.log(`Imported ${events.length} events from ${toExtract.conversations.length} conversation(s) (batch ${batch}).`);
       console.log(`Undo with: persnallyd forget --batch ${batch}`);
       return;
     }

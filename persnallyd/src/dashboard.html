@@ -109,7 +109,7 @@
   /* ── constellation ── */
   .constellation-wrap { position: relative; }
   .constellation { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
-  #graph { display: block; width: 100%; height: 520px; cursor: grab; }
+  #graph { display: block; width: 100%; height: 520px; cursor: grab; touch-action: none; }
   #graph:active { cursor: grabbing; }
   .ghint { position: absolute; top: 12px; right: 14px; font-size: 11px; color: var(--faint); pointer-events: none; }
   .legend { position: absolute; bottom: 12px; left: 14px; display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--dim); pointer-events: none; }
@@ -173,6 +173,17 @@
   .preview-ribbon code { color: var(--text); }
   a { color: var(--text); }
   :focus-visible { outline: 2px solid #FFFFFF; outline-offset: 3px; border-radius: 4px; }
+  @media (max-width: 640px) {
+    .wrap { padding: 18px 16px 96px; }
+    #graph { height: 380px; }
+    .archetype { font-size: clamp(22px, 7vw, 30px); }
+    header { margin-bottom: 24px; }
+    .value-num { font-size: 32px; }
+    #topicList { overflow-x: auto; }   /* wide table scrolls inside its card — body never does */
+    .bar-track { width: 64px; }
+    td { padding: 8px 6px; font-size: 13px; }
+    .del { padding: 3px 7px; }
+  }
   @media (prefers-reduced-motion: reduce) { .reveal { animation: none; opacity: 1; transform: none; } .read.fresh { animation: none; } }
 </style>
 </head>
@@ -215,7 +226,7 @@
       <div class="view-toggle"><button id="vGraph" class="on">map</button><button id="vList">list</button></div>
     </div>
     <div class="constellation-wrap">
-      <div class="constellation" id="graphHost"><canvas id="graph"></canvas><div class="legend" id="legend"></div><div class="ghint">drag · scroll to zoom · dbl-click resets</div></div>
+      <div class="constellation" id="graphHost"><canvas id="graph"></canvas><div class="legend" id="legend"></div><div class="ghint">drag · pinch or scroll to zoom</div></div>
       <div class="card" id="topicList" style="display:none;padding:6px 14px"><table id="topics"></table></div>
       <div class="node-pop" id="nodePop"></div>
     </div>
@@ -276,6 +287,20 @@ function clientOf(ev) {
 }
 const prettyClient = (c) => ({ "claude-code":"Claude Code","claude-desktop":"Claude Desktop","cursor":"Cursor","cli":"CLI" }[c] || c);
 const clientInitials = (c) => prettyClient(c).split(/[\s-]/).map(w=>w[0]).join("").slice(0,2).toUpperCase();
+const IMPORT_TOOL = { "import:claude":"Claude export", "import:chatgpt":"ChatGPT export", "import:claude-code":"Claude Code" };
+// Human-readable provenance for the "why?" panel — where a fact actually came from.
+function provLabel(e) {
+  const p = e.provenance || {};
+  if (p.kind === "import") {
+    const base = IMPORT_TOOL[e.source] || p.file || "import";
+    return p.conversation_uuid ? `${base} · conversation ${String(p.conversation_uuid).slice(0,8)}` : base;
+  }
+  if (p.kind === "mcp") return `${prettyClient(p.client)}${p.session ? " · session " + String(p.session).slice(0,8) : ""} · live`;
+  if (p.kind === "git") return `git: ${p.repo}${p.ref ? " @ " + p.ref : ""}`;
+  if (p.kind === "derived") return `inferred from ${(p.from||[]).length} signal${(p.from||[]).length===1?"":"s"}`;
+  if (p.kind === "local") return `you · ${p.surface || "local"}`;
+  return p.kind || "local";
+}
 
 const SNAP_KEY = "persnally.snapshot.v1";
 let DEMO = false;
@@ -344,8 +369,7 @@ async function toggleEvidence(btn) {
   box.innerHTML = events.map(e => {
     const p = e.payload || {};
     const summary = e.type === "signal.topic" ? `${p.topic} (${p.intent})` : (p.claim ?? p.topic ?? JSON.stringify(p).slice(0,90));
-    const origin = e.provenance && e.provenance.kind === "import" ? `${(e.provenance.file||"import")}` : (e.provenance ? e.provenance.kind : "local");
-    return `<div class="ev-item"><code>${esc(e.type)}</code> ${esc(summary)} — <i>${esc(origin)}, ${esc((e.ts||"").slice(0,10))}</i></div>`;
+    return `<div class="ev-item"><code>${esc(e.type)}</code> ${esc(summary)} — <i>${esc(provLabel(e))}, ${esc((e.ts||"").slice(0,10))}</i></div>`;
   }).join("") || `<div class="ev-item">evidence not found (deleted?)</div>`;
   box.dataset.loaded = "1";
 }
@@ -436,7 +460,7 @@ function renderMap(topics) {
   const ctx = canvas.getContext("2d");
   const dpr = Math.min(devicePixelRatio || 1, 2);
   let w, h;
-  const resize = () => { w = host.clientWidth; h = 520; canvas.width = w*dpr; canvas.height = h*dpr; canvas.style.height = h+"px"; };
+  const resize = () => { w = host.clientWidth; h = window.innerWidth < 640 ? 380 : 520; canvas.width = w*dpr; canvas.height = h*dpr; canvas.style.height = h+"px"; };
   resize();
 
   const maxW = Math.max(...data.map(t=>t.weight), 0.01);
@@ -510,24 +534,55 @@ function renderMap(topics) {
   $("legend").innerHTML = cats.map(c => `<span><i style="color:${catColor(c)}"></i><span style="color:var(--dim)">${esc(c)}</span></span>`).join("");
 
   const pop=$("nodePop");
-  const nodeAt=(mx,my)=>{ const wx=S2Wx(mx),wy=S2Wy(my); for (let i=nodes.length-1;i>=0;i--) if (Math.hypot(wx-nodes[i].x,wy-nodes[i].y)<=nodes[i].r+5/cam.k) return i; return -1; };
+  const nodeAt=(mx,my)=>{ const wx=S2Wx(mx),wy=S2Wy(my); for (let i=nodes.length-1;i>=0;i--) if (Math.hypot(wx-nodes[i].x,wy-nodes[i].y)<=nodes[i].r+8/cam.k) return i; return -1; };
   const rel=(e)=>{ const r=canvas.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
-  canvas.onmousedown=(e)=>{ const [mx,my]=rel(e); const n=nodeAt(mx,my); if (n>=0) dragNode=n; else panning=true; lastX=mx; lastY=my; };
-  const onMove=(e)=>{ const [mx,my]=rel(e);
+  function showPop(n) { const p=nodes[n].t;
+    pop.innerHTML=`<div class="npt">${esc(p.topic)}</div><div class="npm">${esc(p.category)} · ${esc(p.dominant_intent)} · weight ${p.weight.toFixed(2)} · ${p.signals}×</div>${(p.entities||[]).length?`<div class="npe">${esc(p.entities.slice(0,4).join(", "))}</div>`:""}`;
+    pop.style.left=Math.min(W2Sx(nodes[n].x)+14,w-250)+"px"; pop.style.top=(W2Sy(nodes[n].y)+14)+"px"; pop.classList.add("show"); }
+
+  // Pointer events unify mouse + touch + pen; a second pointer drives pinch-zoom, a tap inspects.
+  const pts=new Map();
+  let downX=0, downY=0, moved=false, pinchD=0, pinchX=0, pinchY=0;
+  canvas.onpointerdown=(e)=>{
+    const [mx,my]=rel(e); pts.set(e.pointerId,{x:mx,y:my});
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* capture unsupported — degrade to no-capture */ }
+    if (pts.size>=2) { dragNode=-1; panning=false; pop.classList.remove("show"); hover=-1;
+      const [a,b]=[...pts.values()]; pinchD=Math.hypot(a.x-b.x,a.y-b.y)||1; pinchX=(a.x+b.x)/2; pinchY=(a.y+b.y)/2; return; }
+    downX=mx; downY=my; moved=false; lastX=mx; lastY=my;
+    const n=nodeAt(mx,my); if (n>=0) dragNode=n; else panning=true;
+  };
+  canvas.onpointermove=(e)=>{
+    const [mx,my]=rel(e); if (pts.has(e.pointerId)) pts.set(e.pointerId,{x:mx,y:my});
+    if (pts.size>=2) { const [a,b]=[...pts.values()];
+      const d=Math.hypot(a.x-b.x,a.y-b.y)||1, cx=(a.x+b.x)/2, cy=(a.y+b.y)/2, wx=S2Wx(cx), wy=S2Wy(cy);
+      cam.k=Math.max(0.45,Math.min(3,cam.k*(d/pinchD)));
+      cam.x=cx-wx*cam.k+(cx-pinchX); cam.y=cy-wy*cam.k+(cy-pinchY);
+      pinchD=d; pinchX=cx; pinchY=cy; if(!alive)draw(); return; }
+    if ((dragNode>=0||panning) && (Math.abs(mx-downX)>4||Math.abs(my-downY)>4)) moved=true;
     if (dragNode>=0) { nodes[dragNode].x=S2Wx(mx); nodes[dragNode].y=S2Wy(my); nodes[dragNode].vx=0; nodes[dragNode].vy=0; pop.classList.remove("show"); wake(); if(!alive)draw(); return; }
     if (panning) { cam.x+=mx-lastX; cam.y+=my-lastY; lastX=mx; lastY=my; if(!alive)draw(); return; }
+    if (e.pointerType==="touch") return;  // no hover on touch — a tap inspects instead
     if (mx<0||my<0||mx>w||my>h) { if (hover!==-1){hover=-1;pop.classList.remove("show");if(!alive)draw();} return; }
     const n=nodeAt(mx,my);
-    if (n!==hover) { hover=n; if(!alive)draw();
-      if (n>=0) { const p=nodes[n].t; pop.innerHTML=`<div class="npt">${esc(p.topic)}</div><div class="npm">${esc(p.category)} · ${esc(p.dominant_intent)} · weight ${p.weight.toFixed(2)} · ${p.signals}×</div>${(p.entities||[]).length?`<div class="npe">${esc(p.entities.slice(0,4).join(", "))}</div>`:""}`;
-        pop.style.left=Math.min(W2Sx(nodes[n].x)+14,w-250)+"px"; pop.style.top=(W2Sy(nodes[n].y)+14)+"px"; pop.classList.add("show"); }
-      else pop.classList.remove("show"); } };
-  const onUp=()=>{ if (dragNode>=0){ dragNode=-1; wake(); } panning=false; };
+    if (n!==hover) { hover=n; if(!alive)draw(); if (n>=0) showPop(n); else pop.classList.remove("show"); }
+  };
+  const endPointer=(e)=>{
+    const tapped = (!moved && pts.size<=1 && e.pointerType==="touch") ? nodeAt(...rel(e)) : -1;
+    pts.delete(e.pointerId);
+    if (dragNode>=0) { dragNode=-1; wake(); }
+    panning=false;
+    if (tapped>=0) { if (hover===tapped && pop.classList.contains("show")) { hover=-1; pop.classList.remove("show"); } else { hover=tapped; showPop(tapped); } if(!alive)draw(); }
+    else if (!moved && e.pointerType==="touch") { hover=-1; pop.classList.remove("show"); if(!alive)draw(); }
+    if (pts.size===1) { const [p]=[...pts.values()]; lastX=p.x; lastY=p.y; panning=true; moved=true; }  // pinch → one finger: resume pan
+  };
+  canvas.onpointerup=endPointer; canvas.onpointercancel=endPointer;
   canvas.onwheel=(e)=>{ e.preventDefault(); const [mx,my]=rel(e); const wx=S2Wx(mx),wy=S2Wy(my); const f=e.deltaY<0?1.12:1/1.12; cam.k=Math.max(0.45,Math.min(3,cam.k*f)); cam.x=mx-wx*cam.k; cam.y=my-wy*cam.k; if(!alive)draw(); };
   canvas.ondblclick=()=>{ cam.k=1; cam.x=0; cam.y=0; if(!alive)draw(); };
   let rt; const onWinResize=()=>{ clearTimeout(rt); rt=setTimeout(()=>{ resize(); if(!alive)draw(); },150); };
-  window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp); window.addEventListener("resize", onWinResize, { passive:true });
-  mapCleanup=()=>{ window.removeEventListener("mousemove",onMove); window.removeEventListener("mouseup",onUp); window.removeEventListener("resize",onWinResize); };
+  window.addEventListener("resize", onWinResize, { passive:true });
+  mapCleanup=()=>{ window.removeEventListener("resize",onWinResize); };
+
+  if (window.innerWidth < 640) switchView("list");  // phones land on the list; the map is one tap away
 }
 function switchView(v) {
   const g = v==="graph" || v==="map";
@@ -554,6 +609,7 @@ async function loadAll() {
   const st = $("status");
   st.querySelector(".dot").classList.toggle("off", DEMO);
   st.querySelector(".lbl").textContent = DEMO ? "preview" : "active";
+  if (!DEMO) get("/health").then(h => { if (h && h.version) $("ver").textContent = `· v${h.version}`; });
   const total = (stats.byType && stats.byType["context.read"]) || reads.length;
   renderDelta(topics, reads, assertions);
   renderScaleBeat(stats);

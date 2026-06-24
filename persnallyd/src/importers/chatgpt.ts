@@ -4,11 +4,11 @@
  * === "user" nodes with content.parts. Multimodal parts are skipped.
  */
 
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { safeIso } from "../events.js";
 import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
-import { extractEvents, type ImportResult, type ParsedConversation, type ParsedExport } from "./extract.js";
+import { extractEvents, readImportFile, type ImportResult, type ParsedConversation, type ParsedExport } from "./extract.js";
 
 interface ChatGPTNode {
   message?: {
@@ -30,7 +30,7 @@ export function parseChatGPTExport(path: string): ParsedExport {
   const file = statSync(path).isDirectory() ? join(path, "conversations.json") : path;
   if (!existsSync(file)) throw new Error(`No conversations.json at ${path}`);
 
-  const raw = JSON.parse(readFileSync(file, "utf-8")) as ChatGPTConversation[];
+  const raw = JSON.parse(readImportFile(file)) as ChatGPTConversation[];
   const conversations: ParsedConversation[] = raw.map((c) => {
     const nodes = Object.values(c.mapping ?? {})
       .filter((n) => n.message?.author?.role === "user")

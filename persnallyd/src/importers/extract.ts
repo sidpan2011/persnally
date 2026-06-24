@@ -3,6 +3,7 @@
  * Parsers produce a ParsedExport; this turns it into provenance-linked events.
  */
 
+import { readFileSync, statSync } from "node:fs";
 import { z } from "zod";
 import { newEvent, safeIso, uuidv7, PAYLOAD_SCHEMAS, type PersnallyEvent } from "../events.js";
 import { anthropicExtract, DEFAULT_EXTRACT_MODEL, type LlmExtract } from "../llm.js";
@@ -10,6 +11,19 @@ import { proseLines, stripNoise } from "../prose.js";
 import { analyzeVoice } from "../stylometry.js";
 
 const MAX_CONVO_CHARS = 30_000;
+const MAX_IMPORT_FILE_BYTES = 400 * 1024 * 1024; // ~400 MB — under Node's ~512 MB string cap; larger needs streaming
+
+/** Reads an export file, refusing oversized ones with a clear message instead of an opaque OOM/crash. */
+export function readImportFile(path: string, maxBytes: number = MAX_IMPORT_FILE_BYTES): string {
+  const { size } = statSync(path);
+  if (size > maxBytes) {
+    throw new Error(
+      `${path} is ${Math.round(size / 1e6)} MB, over the ${Math.round(maxBytes / 1e6)} MB import limit. ` +
+        `Very large exports aren't supported yet — import a smaller export or split conversations.json.`,
+    );
+  }
+  return readFileSync(path, "utf-8");
+}
 
 export interface ParsedConversation {
   uuid: string;
@@ -29,6 +43,25 @@ export interface ImportResult {
   events: PersnallyEvent[];
   batch: string;
   conversationsProcessed: number;
+}
+
+/**
+ * Filters a parsed export to the conversations not already imported (matched by
+ * uuid), so a re-import only adds new chats instead of doubling the graph. The
+ * one-time memory/projects snapshot carries no per-conversation id, so it's kept
+ * only on the first import of a source.
+ */
+export function freshConversations(
+  parsed: ParsedExport,
+  seen: Set<string>,
+): { parsed: ParsedExport; skipped: number; firstImport: boolean } {
+  const firstImport = seen.size === 0;
+  const conversations = parsed.conversations.filter((c) => !c.uuid || !seen.has(c.uuid));
+  const skipped = parsed.conversations.length - conversations.length;
+  const next = firstImport
+    ? { ...parsed, conversations }
+    : { ...parsed, conversations, memoryText: "", projects: [] };
+  return { parsed: next, skipped, firstImport };
 }
 
 const topicsExtraction = z.object({ topics: z.array(PAYLOAD_SCHEMAS["signal.topic"]) });

@@ -39,7 +39,7 @@ open http://127.0.0.1:4983            # see it, with evidence for every claim
 ## How it works
 
 ```
-  Your AI clients (Claude, Cursor, agents…)        Importers (claude · chatgpt · git)
+  Your AI clients (Claude, Cursor, agents…)   Importers (claude · claude-code · chatgpt · git)
         │  MCP: context out, signals in                  │  your history → events
         ▼                                                ▼
   ┌──────────────────────── persnallyd (local daemon) ────────────────────────┐
