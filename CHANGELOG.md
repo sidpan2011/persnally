@@ -2,6 +2,11 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.5.2] - 2026-06-25
+
+### Fixed
+- Dashboard "since you last looked" strip: change items ran together with no separators, and the label floated to the middle when they wrapped to a second line. The label now sits on its own line and the items wrap as a clean `·`-separated row.
+
 ## [2.5.1] - 2026-06-25
 
 ### Fixed
