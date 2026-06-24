@@ -189,6 +189,8 @@
     .bar-track { width: 64px; }
     td { padding: 8px 6px; font-size: 13px; }
     .del { padding: 3px 7px; }
+    .delta .items { display: flex; flex-direction: column; gap: 6px; line-height: 1.45; }
+    .delta .sep { display: none; }   /* stacked on phones — separators only read inline */
   }
   @media (prefers-reduced-motion: reduce) { .reveal { animation: none; opacity: 1; transform: none; } .read.fresh { animation: none; } }
 </style>
