@@ -2,6 +2,11 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.5.1] - 2026-06-25
+
+### Fixed
+- Retention pulse anchors the week-2 window to the **first context read** (when serving began), not onboarding — so a gap between setup and the first read reads as "in progress," not a false "not retained." For a fresh install (setup and first read minutes apart) the verdict is unchanged. Adds `firstReadAt` / `daysSinceFirstRead`.
+
 ## [2.5.0] - 2026-06-25
 
 ### Added
