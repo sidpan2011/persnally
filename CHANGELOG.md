@@ -2,6 +2,14 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.5.3] - 2026-06-25
+
+### Added
+- `persnallyd restart` — restarts the daemon correctly whether it's launchd-managed (unload + reload the job, which also heals a plist path that has drifted from the running process) or a plain background process. Ends the confusing "stop just respawns it" loop under autostart.
+
+### Changed
+- `start`, `restart`, and `setup` now print the dashboard URL **and** open it (macOS, interactive terminal); `autostart` prints the link. `stop` now points to `persnallyd restart` for a clean bounce.
+
 ## [2.5.2] - 2026-06-25
 
 ### Fixed
