@@ -4,7 +4,7 @@ Phase 0 "describe-me" experiment.
 
 Parses a Claude data export and asks Claude to describe the person behind it.
 Persnally bets on this output being *startling*, not just accurate.
-If it's merely neat, the core idea does not hold.
+If it's merely neat, the core idea doesn't hold.
 
 Usage:
     export ANTHROPIC_API_KEY=sk-ant-...

@@ -6,7 +6,7 @@
 
 ## Why the architecture is hard to replicate
 
-| Property | Why it is hard for a cloud incumbent to match |
+| Property | Why it's hard for a cloud incumbent to match |
 |---|---|
 | Local-first | Memory-layer companies are cloud businesses; going local deletes their revenue model |
 | Cross-vendor | Platform memory exists *to* lock in; vendors won't share user context with rivals |
