@@ -170,6 +170,20 @@ function Hero() {
               <ArrowUpRight className="size-3 shrink-0 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </a>
           </div>
+          <a
+            href="https://www.producthunt.com/products/persnally?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-persnally"
+            {...EXT}
+            aria-label="Persnally on Product Hunt"
+            className="mt-1 inline-block transition-opacity hover:opacity-90"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1182562&theme=light&t=1782584790813"
+              alt="Persnally - So every AI finally knows you | Product Hunt"
+              width={250}
+              height={54}
+            />
+          </a>
         </div>
       </div>
 
