@@ -240,6 +240,17 @@
 
   <div id="delta"></div>
 
+  <style>
+    .onboard{margin:0 0 22px}
+    .onboard .ob-card{border:1px solid #2c67ff55;box-shadow:0 0 0 1px #2c67ff14}
+    .onboard .ob-or{margin:16px 0 8px;color:#8b90a0;font-size:13px}
+    .onboard .ob-row{display:flex;gap:8px;max-width:540px}
+    .onboard .ob-bar{height:8px;border-radius:6px;background:#ffffff14;overflow:hidden;margin-top:10px}
+    .onboard .ob-fill{height:100%;width:0;background:#2c67ff;transition:width .35s ease}
+    .onboard input{flex:1;background:#0e1016;border:1px solid #1b1e26;border-radius:8px;color:#f5f6f8;padding:9px 12px;font:inherit;min-width:0}
+  </style>
+  <div id="onboard" class="onboard" style="display:none"></div>
+
   <div class="hero reveal" style="animation-delay:.05s">
     <div class="scale-beat" id="scaleBeat"></div>
     <div class="archetype" id="archetype">Reading your context…</div>
@@ -715,6 +726,62 @@ function switchView(v) {
 $("vGraph").onclick = () => switchView("map");
 $("vList").onclick = () => switchView("list");
 
+/* ── engine onboarding (local-first: Ollama one-click, key optional) ── */
+function renderOnboard(engine, profile) {
+  const el = $("onboard");
+  // Show only when there's no engine at all and no portrait yet — once either
+  // exists the normal dashboard (and the Re-synthesize button) take over.
+  const ready = engine && (engine.hasKey || (engine.ollama && engine.ollama.hasModel));
+  if (DEMO || !engine || ready || profile) { el.style.display = "none"; el.innerHTML = ""; return; }
+  el.style.display = "";
+  const oll = engine.ollama || { reachable:false };
+  const local = oll.reachable
+    ? `<button class="btn" id="obPull">Set up local AI — download model (~2GB)</button>
+       <div class="sub" style="margin-top:6px">Runs entirely on your machine. Free. Nothing leaves your computer.</div>
+       <div id="obProg" style="display:none"><div class="ob-bar"><div class="ob-fill" id="obFill"></div></div><div class="sub" id="obStat" style="margin-top:6px"></div></div>`
+    : `<a class="btn" href="https://ollama.com/download" target="_blank" rel="noopener">Install Ollama — local &amp; free <span class="arr">↗</span></a>
+       <div class="sub" style="margin-top:6px">One install and your data stays on this machine. <button class="link-btn" id="obRecheck">Recheck</button> once it's running.</div>`;
+  el.innerHTML = `<div class="card ob-card">
+    <div class="claim-title">Set up your AI engine to see your portrait</div>
+    <div class="sub" style="margin:4px 0 14px">Persnally needs a model to read your history and write your self-portrait. Choose local (private, free) — or bring your own key.</div>
+    <div style="display:flex;flex-direction:column;gap:2px;max-width:540px">${local}</div>
+    <div class="ob-or">— or use your own Anthropic key —</div>
+    <div class="ob-row"><input id="obKey" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"><button class="btn ghost" id="obSaveKey">Save &amp; use</button></div>
+    <div class="sub" id="obKeyMsg" style="margin-top:6px"></div>
+    <div class="sub" style="margin-top:14px">No model yet? You can still import code offline — <code>persnallyd import git &lt;path&gt;</code> (no AI needed).</div>
+  </div>`;
+  if (oll.reachable) $("obPull").onclick = () => startPull(engine.recommended);
+  else $("obRecheck").onclick = () => loadAll();
+  $("obSaveKey").onclick = saveKey;
+  $("obKey").addEventListener("keydown", (e) => { if (e.key === "Enter") saveKey(); });
+}
+
+async function startPull(model) {
+  $("obProg").style.display = ""; $("obPull").disabled = true;
+  $("obStat").textContent = "Starting…";
+  const r = await fetch("/engine/pull", { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ model }) });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); $("obStat").textContent = e.error || ("Couldn't start (" + r.status + ")"); $("obPull").disabled=false; return; }
+  (async function poll() {
+    const p = await get("/engine/pull");
+    if (!p) return void setTimeout(poll, 1500);
+    $("obFill").style.width = (p.percent||0) + "%";
+    if (p.state === "pulling") { $("obStat").textContent = (p.status||"downloading") + " · " + (p.percent||0) + "%"; return void setTimeout(poll, 1500); }
+    if (p.state === "error") { $("obStat").textContent = "Failed: " + (p.error||"unknown"); $("obPull").disabled=false; return; }
+    if (p.state === "done") { $("obStat").textContent = "Model ready — writing your portrait…"; await fetch("/synthesize", { method:"POST" }); return void loadAll(); }
+    setTimeout(poll, 1500);
+  })();
+}
+
+async function saveKey() {
+  const key = $("obKey").value.trim();
+  if (!key.startsWith("sk-ant-")) { $("obKeyMsg").textContent = "Enter a key starting with sk-ant-"; return; }
+  $("obSaveKey").disabled = true; $("obKeyMsg").textContent = "Saving…";
+  const r = await fetch("/engine/key", { method:"POST", headers:{ "content-type":"application/json" }, body: JSON.stringify({ key }) });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); $("obKeyMsg").textContent = e.error || ("Failed (" + r.status + ")"); $("obSaveKey").disabled=false; return; }
+  $("obKeyMsg").textContent = "Saved — writing your portrait…";
+  await fetch("/synthesize", { method:"POST" }); loadAll();
+}
+
 /* ── load ── */
 async function loadAll() {
   let stats, profile, topics, reads, assertions, voice, activity;
@@ -729,6 +796,7 @@ async function loadAll() {
     ({ stats, profile, topics, reads, assertions, voice, activity } = DEMO_DATA());
   }
   topics = topics||[]; reads = reads||[]; assertions = assertions||[];
+  const engine = DEMO ? null : await get("/engine");
   const st = $("status");
   st.querySelector(".dot").classList.toggle("off", DEMO);
   st.querySelector(".lbl").textContent = DEMO ? "preview" : "active";
@@ -737,6 +805,7 @@ async function loadAll() {
   renderDelta(topics, reads, assertions);
   renderScaleBeat(stats);
   renderPortrait(profile);
+  renderOnboard(engine, profile);
   renderVoice(voice);
   renderTopicList(topics);
   renderMap(topics);
@@ -750,7 +819,8 @@ async function loadAll() {
 $("synthesize").onclick = async () => {
   const b = $("synthesize"); if (DEMO) return alert("Preview mode — start persnallyd to synthesize for real.");
   b.disabled = true; b.textContent = "Synthesizing…";
-  const r = await fetch("/synthesize", { method:"POST" }); if (!r.ok) alert("Synthesis failed — check the daemon log.");
+  const r = await fetch("/synthesize", { method:"POST" });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); alert(e.error || "Synthesis failed — check the daemon log."); }
   b.disabled = false; b.textContent = "Re-synthesize"; loadAll();
 };
 $("reflect").onclick = async () => {
@@ -918,7 +988,7 @@ function DEMO_DATA() {
   const now = Date.now(), iso = (d)=>new Date(now-d).toISOString();
   return {
     stats: { total:4127, byType:{ "signal.topic":312, "signal.assertion":14, "context.read":1247 }, bySource:{ "git:persnallyd":58 }, first:iso(86400000*214), last:iso(3600000*2) },
-    profile: { headline:"A refactor-first systems thinker who ships hardest under a deadline.", model:"fable-5", generated_at:iso(3600000*5).slice(0,10),
+    profile: { headline:"A refactor-first systems thinker who ships hardest under a deadline.", model:"opus-4-8", generated_at:iso(3600000*5).slice(0,10),
       sections:[
         { title:"How you work", body:"You build in tight, evidence-driven loops — prototype, measure, delete. You reach for SQLite and local-first architectures before reaching for a cloud, and you distrust abstractions you can't audit. Your commits are small and frequent, and you keep a working build at every step rather than big-bang merges.", evidence_event_ids:["e1","e2","e3","e4"] },
         { title:"How you decide", body:"You kill ideas fast and out loud. You actively seek the case against your own plans, and you change course when the evidence turns — rare for someone who generates this many ideas. You ask for the falsification first.", evidence_event_ids:["e5","e6","e7"] },

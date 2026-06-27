@@ -1,7 +1,6 @@
 /**
  * Structured extraction shared by importers and profile synthesis.
- * Uses output_config structured outputs (works on every current model,
- * including Fable 5 where forced tool_choice is not supported).
+ * Uses output_config structured outputs (broadly supported; no forced tool_choice).
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -9,7 +8,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
 export const DEFAULT_EXTRACT_MODEL = process.env.PERSNALLY_MODEL ?? "claude-haiku-4-5";
-export const DEFAULT_PROFILE_MODEL = process.env.PERSNALLY_PROFILE_MODEL ?? "claude-fable-5";
+export const DEFAULT_PROFILE_MODEL = process.env.PERSNALLY_PROFILE_MODEL ?? "claude-opus-4-8";
 
 export type LlmExtract = (opts: {
   model: string;
@@ -43,6 +42,51 @@ export const anthropicExtract: LlmExtract = async ({ model, instruction, schema,
 const OLLAMA_URL = process.env.PERSNALLY_OLLAMA_URL ?? "http://127.0.0.1:11434";
 const LOCAL_MODEL_PREFERENCE = ["qwen2.5:14b", "qwen2.5:7b", "llama3.1:8b", "llama3.2", "qwen2.5:1.5b"];
 
+// Smallest model that still yields a usable profile — the one-click local default.
+// (~2GB; bigger models in LOCAL_MODEL_PREFERENCE win automatically once present.)
+export const RECOMMENDED_LOCAL_MODEL = "llama3.2";
+
+/** Installed Ollama models, or null if Ollama isn't reachable (not installed / not running). */
+export async function ollamaTags(): Promise<string[] | null> {
+  try {
+    const r = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(1500) });
+    if (!r.ok) return null;
+    return ((await r.json()) as { models?: { name: string }[] }).models?.map((m) => m.name) ?? [];
+  } catch {
+    return null;
+  }
+}
+
+/** Streams an `ollama pull`, reporting download progress (0–100). Throws on failure. */
+export async function pullOllamaModel(
+  model: string,
+  onProgress: (p: { status: string; percent: number }) => void,
+): Promise<void> {
+  const r = await fetch(`${OLLAMA_URL}/api/pull`, {
+    method: "POST",
+    body: JSON.stringify({ name: model, stream: true }),
+  });
+  if (!r.ok || !r.body) throw new Error(`ollama pull: ${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`);
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? ""; // keep the partial last line for the next chunk
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let obj: { status?: string; total?: number; completed?: number; error?: string };
+      try { obj = JSON.parse(line); } catch { continue; }
+      if (obj.error) throw new Error(`ollama pull: ${obj.error}`);
+      const percent = obj.total ? Math.round(((obj.completed ?? 0) / obj.total) * 100) : 0;
+      onProgress({ status: obj.status ?? "", percent });
+    }
+  }
+}
+
 export const ollamaExtract: LlmExtract = async ({ model, instruction, schema, content }) => {
   const r = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST",
@@ -63,13 +107,9 @@ export const ollamaExtract: LlmExtract = async ({ model, instruction, schema, co
 
 async function localModel(): Promise<string | null> {
   if (process.env.PERSNALLY_LOCAL_MODEL) return process.env.PERSNALLY_LOCAL_MODEL;
-  try {
-    const r = await fetch(`${OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(1500) });
-    const tags = ((await r.json()) as { models?: { name: string }[] }).models?.map((m) => m.name) ?? [];
-    return LOCAL_MODEL_PREFERENCE.find((p) => tags.some((t) => t === p || t === `${p}:latest`)) ?? tags[0] ?? null;
-  } catch {
-    return null;
-  }
+  const tags = await ollamaTags();
+  if (!tags) return null;
+  return LOCAL_MODEL_PREFERENCE.find((p) => tags.some((t) => t === p || t === `${p}:latest`)) ?? tags[0] ?? null;
 }
 
 export interface ChosenExtractor {
