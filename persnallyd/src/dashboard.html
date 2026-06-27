@@ -193,6 +193,32 @@
     .delta .sep { display: none; }   /* stacked on phones — separators only read inline */
   }
   @media (prefers-reduced-motion: reduce) { .reveal { animation: none; opacity: 1; transform: none; } .read.fresh { animation: none; } }
+
+  /* ── hero intro (plain-language "what am I looking at") ── */
+  .hero-sub { font-size: 14.5px; color: var(--dim); margin-top: 14px; max-width: 64ch; line-height: 1.65; }
+  .hero-sub b { color: var(--text); font-weight: 600; }
+
+  /* ── shareable portrait card ── */
+  .modal { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center;
+    padding: 24px; background: rgba(5,6,8,0.80); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .modal.open { display: flex; }
+  .modal-inner { background: var(--panel); border: 1px solid var(--line-2); border-radius: 16px; width: 100%;
+    max-width: 860px; max-height: 92vh; overflow: auto; padding: 22px 24px; display: grid; gap: 20px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .modal-inner { grid-template-columns: minmax(0,330px) 1fr; align-items: start; } }
+  .modal-head { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .modal-head h3 { font-size: 16px; font-weight: 600; }
+  .modal-head .x { background: none; border: none; color: var(--dim); font-size: 24px; cursor: pointer; line-height: 1; }
+  .modal-head .x:hover { color: var(--text); }
+  .card-preview { border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #000; align-self: start; }
+  .card-preview canvas { display: block; width: 100%; height: auto; }
+  .card-ctrls { display: flex; flex-direction: column; gap: 18px; }
+  .card-ctrls .sub { font-size: 13px; color: var(--dim); line-height: 1.6; }
+  .toggles { display: flex; flex-direction: column; gap: 11px; }
+  .tog { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; user-select: none; }
+  .tog input { width: 16px; height: 16px; accent-color: #FFFFFF; cursor: pointer; }
+  .card-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .privacy-note { font-size: 11.5px; color: var(--faint); line-height: 1.65; }
+  .privacy-note b { color: var(--dim); }
 </style>
 </head>
 <body>
@@ -206,7 +232,8 @@
       <a class="btn ghost" href="https://github.com/sidpan2011/persnally" target="_blank" rel="noopener">GitHub <span class="arr">↗</span></a>
       <a class="btn ghost" href="https://persnally.com" target="_blank" rel="noopener">persnally.com <span class="arr">↗</span></a>
       <button class="btn ghost" id="reflect">Reflect</button>
-      <button class="btn" id="synthesize">Re-synthesize</button>
+      <button class="btn ghost" id="synthesize">Re-synthesize</button>
+      <button class="btn" id="shareBtn">Share portrait <span class="arr" style="opacity:.75">✦</span></button>
     </div>
   </header>
 
@@ -215,6 +242,7 @@
   <div class="hero reveal" style="animation-delay:.05s">
     <div class="scale-beat" id="scaleBeat"></div>
     <div class="archetype" id="archetype">Reading your context…</div>
+    <div class="hero-sub">Built from <b>your own AI history</b> — your tools read this so they stop treating you like a stranger, and <b>every byte stays on your machine</b>.</div>
     <div class="gen-meta" id="genMeta"></div>
   </div>
 
@@ -234,7 +262,7 @@
       <div class="view-toggle"><button id="vGraph" class="on">map</button><button id="vList">list</button></div>
     </div>
     <div class="constellation-wrap">
-      <div class="constellation" id="graphHost"><canvas id="graph"></canvas><div class="legend" id="legend"></div><div class="ghint">drag · pinch or scroll to zoom</div></div>
+      <div class="constellation" id="graphHost"><canvas id="graph"></canvas><div class="legend" id="legend"></div><div class="ghint">interests by strength · drag · zoom</div></div>
       <div class="card" id="topicList" style="display:none;padding:6px 14px"><table id="topics"></table></div>
       <div class="node-pop" id="nodePop"></div>
     </div>
@@ -261,6 +289,30 @@
   </footer>
 </div>
 <div class="preview-ribbon" id="ribbon">preview data — start <code>persnallyd</code> and reload to see your own</div>
+
+<div class="modal" id="shareModal" aria-hidden="true">
+  <div class="modal-inner" role="dialog" aria-label="Share your portrait">
+    <div class="modal-head">
+      <h3>Share your portrait</h3>
+      <button class="x" id="shareClose" aria-label="Close">×</button>
+    </div>
+    <div class="card-preview"><canvas id="cardCanvas"></canvas></div>
+    <div class="card-ctrls">
+      <div class="sub">A snapshot of who your AI knows you to be. Pick what's on it — drawn here on your machine, never uploaded.</div>
+      <div class="toggles">
+        <label class="tog"><input type="checkbox" id="tHead" checked> Headline — your archetype</label>
+        <label class="tog"><input type="checkbox" id="tInt" checked> Top interests</label>
+        <label class="tog"><input type="checkbox" id="tVoice" checked> How you write</label>
+        <label class="tog"><input type="checkbox" id="tStats" checked> Stats</label>
+      </div>
+      <div class="card-actions">
+        <button class="btn" id="cardDownload">Download PNG</button>
+        <button class="btn ghost" id="cardCopy">Copy image</button>
+      </div>
+      <div class="privacy-note"><b>Nothing is uploaded</b> — the image is rendered locally and saved by you. The footer credits persnally.com so others can find it.</div>
+    </div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -488,16 +540,37 @@ function renderMap(topics) {
   const resize = () => { w = host.clientWidth; h = window.innerWidth < 640 ? 380 : 520; canvas.width = w*dpr; canvas.height = h*dpr; canvas.style.height = h+"px"; };
   resize();
 
-  const maxW = Math.max(...data.map(t=>t.weight), 0.01);
-  const cats = [...new Set(data.map(t=>t.category))];
-  const cx = w/2, cy = h/2;
-  // each category gets an anchor on a ring → nodes cluster by color (readable + useful)
-  const anchor = {};
-  cats.forEach((c,i) => { const a=(i/cats.length)*Math.PI*2 - Math.PI/2; anchor[c]={ x:cx+Math.cos(a)*Math.min(w,h)*0.30, y:cy+Math.sin(a)*Math.min(w,h)*0.30 }; });
-  const nodes = data.map((t,i) => { const an=anchor[t.category]; return { t, i, color:catColor(t.category),
-    x:an.x+(Math.random()-0.5)*70, y:an.y+(Math.random()-0.5)*70, vx:0, vy:0, r:8+Math.sqrt(t.weight/maxW)*18 }; });
+  const INTERESTS = data.slice(0, 12);
+  const maxW = Math.max(...INTERESTS.map(t=>t.weight), 0.01);
+  const cx = w/2, cy = h/2, ring = Math.min(w,h)*0.27;
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  const warmRGB = (t)=>[Math.round(lerp(255,200,t)),Math.round(lerp(198,140,t)),Math.round(lerp(120,70,t))]; // curated amber: bright gold (strongest) → bronze (lighter), one warm family
+  const rgba = (c,a)=>`rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  const lighten = (c,a)=>[Math.min(255,c[0]+a),Math.min(255,c[1]+a),Math.min(255,c[2]+a)];
+  // radial portrait: YOU at the center, interests radiating by strength, their entities as leaf nodes
+  const center = { kind:"you", x:cx, y:cy, vx:0, vy:0, r:23, rgb:[255,209,130], fixed:true };
+  const interests = INTERESTS.map((t,i) => {
+    const ang = (i/INTERESTS.length)*Math.PI*2 - Math.PI/2;
+    return { kind:"topic", t, ang, x:cx+Math.cos(ang)*ring, y:cy+Math.sin(ang)*ring, vx:0, vy:0,
+      r:9+Math.sqrt(t.weight/maxW)*15, rgb:warmRGB(INTERESTS.length>1 ? i/(INTERESTS.length-1) : 0) };
+  });
+  const leaves = [];
+  interests.forEach((nd, ii) => {
+    (nd.t.entities||[]).slice(0,2).forEach((e,k,arr) => {
+      const a = nd.ang + (k-(arr.length-1)/2)*0.55;
+      leaves.push({ kind:"entity", label:e, x:cx+Math.cos(a)*ring*1.65, y:cy+Math.sin(a)*ring*1.65, vx:0, vy:0, r:4, rgb:[176,196,224], parent:1+ii });
+    });
+  });
+  const nodes = [center, ...interests, ...leaves];
+  const I0 = 1, L0 = 1 + interests.length;
   const edges = [];
-  for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) { const ei=nodes[i].t.entities||[], ej=nodes[j].t.entities||[]; const s=ei.filter(e=>ej.includes(e)).length; if (s) edges.push([i,j,s]); }
+  interests.forEach((_,ii) => edges.push([0, I0+ii, "trunk"]));
+  // synapses: interests that share an entity wire together → a neural web, not just a tree
+  for (let i=0;i<interests.length;i++) for (let j=i+1;j<interests.length;j++) {
+    const ei=interests[i].t.entities||[], ej=interests[j].t.entities||[];
+    if (ei.length && ej.length && ei.some(e=>ej.includes(e))) edges.push([I0+i, I0+j, "synapse"]);
+  }
+  leaves.forEach((lf,li) => edges.push([lf.parent, L0+li, "branch"]));
   const neighbors = nodes.map(()=>new Set());
   edges.forEach(([a,b])=>{ neighbors[a].add(b); neighbors[b].add(a); });
 
@@ -507,63 +580,87 @@ function renderMap(topics) {
 
   function tick() {
     let energy = 0;
-    for (let i=0;i<nodes.length;i++) {
-      const A=nodes[i]; if (i===dragNode) continue;
+    for (let i=1;i<nodes.length;i++) {
+      const A=nodes[i]; if (i===dragNode || A.fixed) continue;
       for (let j=0;j<nodes.length;j++) { if (i===j) continue; const B=nodes[j];
         let dx=A.x-B.x, dy=A.y-B.y, d2=dx*dx+dy*dy||1, d=Math.sqrt(d2);
-        const rep=Math.min(6200/d2, 7); dx/=d; dy/=d; A.vx+=dx*rep; A.vy+=dy*rep;
-        const minD=A.r+B.r+22; if (d<minD) { const p=(minD-d)/2; A.x+=dx*p; A.y+=dy*p; }
+        const rep=Math.min(5000/d2, 6); dx/=d; dy/=d; A.vx+=dx*rep; A.vy+=dy*rep;
+        const minD=A.r+B.r+14; if (d<minD) { const p=(minD-d)/2; A.x+=dx*p; A.y+=dy*p; }
       }
-      const an=anchor[A.t.category]; A.vx+=(an.x-A.x)*0.014; A.vy+=(an.y-A.y)*0.014;  // cluster pull
     }
-    edges.forEach(([a,b]) => { const A=nodes[a],B=nodes[b]; let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||1; const f=(d-120)*0.008; dx/=d;dy/=d;
-      if (a!==dragNode){A.vx+=dx*f;A.vy+=dy*f;} if (b!==dragNode){B.vx-=dx*f;B.vy-=dy*f;} });
-    nodes.forEach((n,i) => { if (i===dragNode) return; n.vx*=0.85; n.vy*=0.85; n.x+=n.vx; n.y+=n.vy; energy+=n.vx*n.vx+n.vy*n.vy; });
+    interests.forEach((nd) => { if (nd===nodes[dragNode]) return; const tx=cx+Math.cos(nd.ang)*ring, ty=cy+Math.sin(nd.ang)*ring; nd.vx+=(tx-nd.x)*0.022; nd.vy+=(ty-nd.y)*0.022; });
+    leaves.forEach((lf) => { if (lf===nodes[dragNode]) return; const p=nodes[lf.parent]; const a=Math.atan2(p.y-cy,p.x-cx)||0; const tx=p.x+Math.cos(a)*44, ty=p.y+Math.sin(a)*44; lf.vx+=(tx-lf.x)*0.05; lf.vy+=(ty-lf.y)*0.05; });
+    for (let i=1;i<nodes.length;i++) { const n=nodes[i]; if (i===dragNode || n.fixed) continue; n.vx*=0.84; n.vy*=0.84; n.x+=n.vx; n.y+=n.vy; energy+=n.vx*n.vx+n.vy*n.vy; }
     return energy;
   }
-  function draw() {
+  function draw(now) {
+    now = now || performance.now(); const T = now * 0.001;
     ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
-    const vg=ctx.createRadialGradient(w/2,h*0.42,0,w/2,h*0.42,Math.max(w,h)*0.6); vg.addColorStop(0,"rgba(255,255,255,0.03)"); vg.addColorStop(1,"rgba(0,0,0,0)"); ctx.fillStyle=vg; ctx.fillRect(0,0,w,h);
+    // backdrop: faint warm core light, cool fall-off — depth, not flat black
+    const bg=ctx.createRadialGradient(w/2,h*0.46,0,w/2,h*0.46,Math.max(w,h)*0.72);
+    bg.addColorStop(0,"rgba(255,176,96,0.05)"); bg.addColorStop(0.55,"rgba(16,18,22,0)"); bg.addColorStop(1,"rgba(6,7,9,0.55)");
+    ctx.fillStyle=bg; ctx.fillRect(0,0,w,h);
+    // gentle perpetual drift — alive without bouncing; used everywhere so nothing desyncs
+    const amp = reduced?0:2.4;
+    const P = nodes.map((n,i)=>({ x:n.x+((n.fixed||i===dragNode)?0:Math.sin(T*0.5+i*1.1)*amp), y:n.y+((n.fixed||i===dragNode)?0:Math.cos(T*0.42+i*1.7)*amp) }));
     ctx.save(); ctx.translate(cam.x,cam.y); ctx.scale(cam.k,cam.k);
-    // curved gradient edges
-    edges.forEach(([a,b]) => { const A=nodes[a],B=nodes[b]; const active=hover===-1||hover===a||hover===b;
-      let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||1; const off=d*0.12, mx=(A.x+B.x)/2+(-dy/d)*off, my=(A.y+B.y)/2+(dx/d)*off;
-      const al = hover===-1 ? "33" : (active ? "aa" : "10");
-      const g=ctx.createLinearGradient(A.x,A.y,B.x,B.y); g.addColorStop(0,A.color+al); g.addColorStop(1,B.color+al);
-      ctx.strokeStyle=g; ctx.lineWidth=(active&&hover!==-1?1.8:1)/cam.k; ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.quadraticCurveTo(mx,my,B.x,B.y); ctx.stroke(); });
-    // glowing nodes
-    nodes.forEach((n,i) => { const active=hover===-1||hover===i||neighbors[hover].has(i); ctx.globalAlpha=active?1:0.18;
-      const halo=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r*2.6); halo.addColorStop(0,n.color+"bb"); halo.addColorStop(0.45,n.color+"33"); halo.addColorStop(1,n.color+"00");
-      ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(n.x,n.y,n.r*2.6,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle=n.color; ctx.shadowColor=n.color; ctx.shadowBlur=i===hover?22:9; ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
-      ctx.fillStyle="rgba(255,255,255,0.9)"; ctx.beginPath(); ctx.arc(n.x-n.r*0.28,n.y-n.r*0.28,n.r*0.26,0,Math.PI*2); ctx.fill(); });
+    // connections — thin, elegant; warm trunks, synapses, faint dendrites
+    edges.forEach(([a,b,kind]) => { const A=P[a],B=P[b]; const active=hover===-1||hover===a||hover===b||neighbors[hover].has(a)||neighbors[hover].has(b);
+      let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||1; const off=d*0.09, mx=(A.x+B.x)/2+(-dy/d)*off, my=(A.y+B.y)/2+(dx/d)*off;
+      if (kind==="trunk") { const al=hover===-1?0.4:(active?0.8:0.06); const g=ctx.createLinearGradient(A.x,A.y,B.x,B.y); g.addColorStop(0,rgba([255,150,80],al)); g.addColorStop(1,rgba(nodes[b].rgb,al*0.7)); ctx.strokeStyle=g; ctx.lineWidth=(active&&hover!==-1?2:1.1)/cam.k; }
+      else if (kind==="synapse") { const al=hover===-1?0.12:(active?0.42:0.03); const g=ctx.createLinearGradient(A.x,A.y,B.x,B.y); g.addColorStop(0,rgba(nodes[a].rgb,al)); g.addColorStop(1,rgba(nodes[b].rgb,al)); ctx.strokeStyle=g; ctx.lineWidth=0.9/cam.k; }
+      else { const al=hover===-1?0.16:(active?0.45:0.03); ctx.strokeStyle=rgba(nodes[a].rgb,al); ctx.lineWidth=0.8/cam.k; }
+      ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.quadraticCurveTo(mx,my,B.x,B.y); ctx.stroke(); });
+    // restrained, steady glow
+    ctx.globalCompositeOperation="lighter";
+    nodes.forEach((n,i) => { const active=hover===-1||hover===i||neighbors[hover].has(i); const k=active?1:0.1; const R=n.r*2.2;
+      const halo=ctx.createRadialGradient(P[i].x,P[i].y,0,P[i].x,P[i].y,R); halo.addColorStop(0,rgba(n.rgb,0.4*k)); halo.addColorStop(0.5,rgba(n.rgb,0.1*k)); halo.addColorStop(1,rgba(n.rgb,0));
+      ctx.fillStyle=halo; ctx.beginPath(); ctx.arc(P[i].x,P[i].y,R,0,Math.PI*2); ctx.fill(); });
+    ctx.globalCompositeOperation="source-over";
+    // refined cores — soft inner light + thin rim, no glossy bead
+    nodes.forEach((n,i) => { const active=hover===-1||hover===i||neighbors[hover].has(i); ctx.globalAlpha=active?1:0.22;
+      const x=P[i].x, y=P[i].y, r=n.r;
+      const cg=ctx.createRadialGradient(x-r*0.3,y-r*0.35,r*0.1,x,y,r); cg.addColorStop(0,rgba(lighten(n.rgb,45),1)); cg.addColorStop(1,rgba(n.rgb,1));
+      ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+      ctx.lineWidth=1/cam.k; ctx.strokeStyle=rgba(lighten(n.rgb,70),i===hover?0.9:0.4); ctx.stroke(); });
     ctx.globalAlpha=1; ctx.restore();
-    // labels in screen space (constant size, collision-free, biggest first)
-    ctx.font="600 12px "+FONT; ctx.textAlign="center"; const placed=[];
+    // labels — clean, tracking the drifted node; entities only on hover
+    ctx.textAlign="center"; const placed=[];
     nodes.map((_,i)=>i).sort((a,b)=>nodes[b].r-nodes[a].r).forEach(i => { const n=nodes[i];
       const active = hover===-1 || hover===i || neighbors[hover].has(i);
-      const force = i===hover || (hover!==-1 && neighbors[hover].has(i));
+      if (n.kind==="entity" && hover===-1) return;
       if (!active && hover!==-1) return;
-      const sx=W2Sx(n.x), sy=W2Sy(n.y), sr=n.r*cam.k, tw=ctx.measureText(n.t.topic).width;
+      const label = n.kind==="you" ? "you" : (n.kind==="topic" ? n.t.topic : n.label);
+      ctx.font = (n.kind==="you" ? "600 12.5px " : "500 11.5px ") + FONT;
+      const sx=W2Sx(P[i].x), sy=W2Sy(P[i].y), sr=n.r*cam.k, tw=ctx.measureText(label).width;
+      const force = i===hover || n.kind==="you" || (hover!==-1 && neighbors[hover].has(i));
       const rect={x:sx-tw/2-3,y:sy+sr+3,w:tw+6,h:15};
       const hit=placed.some(p=>!(rect.x+rect.w<p.x||rect.x>p.x+p.w||rect.y+rect.h<p.y||rect.y>p.y+p.h));
       if (hit && !force) return; placed.push(rect);
-      ctx.globalAlpha = hover===-1?0.92:(active?1:0.2); ctx.fillStyle=i===hover?"#FFFFFF":"#CFD2D8"; ctx.fillText(n.t.topic, sx, sy+sr+15);
+      ctx.globalAlpha = hover===-1?(n.kind==="you"?1:0.82):(active?1:0.2); ctx.fillStyle = (i===hover||n.kind==="you")?"#FFFFFF":"#C7CBD2"; ctx.fillText(label, sx, sy+sr+15);
     });
     ctx.globalAlpha=1;
   }
-  function loop() { if (gen!==mapGen) return; const e=tick(); frames++; draw(); if ((e<0.02 && frames>40) || frames>360) alive=false; if (alive) requestAnimationFrame(loop); }
-  if (reduced) { for (let s=0;s<200;s++) tick(); draw(); alive=false; } else requestAnimationFrame(loop);
-  function wake() { if (!alive && gen===mapGen) { alive=true; frames=320; requestAnimationFrame(loop); } }
+  let physicsSettled=false;
+  function loop(now) { if (gen!==mapGen) return;
+    if (!physicsSettled) { const e=tick(); frames++; if ((e<0.02 && frames>40) || frames>360) physicsSettled=true; }
+    draw(now);
+    if (!reduced || !physicsSettled) requestAnimationFrame(loop); else alive=false;  // keep firing once settled (paused automatically when the tab is hidden)
+  }
+  if (reduced) { for (let s=0;s<200;s++) tick(); physicsSettled=true; draw(performance.now()); alive=false; } else { alive=true; requestAnimationFrame(loop); }
+  function wake() { if (!alive && gen===mapGen) { alive=true; physicsSettled=false; frames=320; requestAnimationFrame(loop); } }
 
-  $("legend").innerHTML = cats.map(c => `<span><i style="color:${catColor(c)}"></i><span style="color:var(--dim)">${esc(c)}</span></span>`).join("");
+  $("legend").innerHTML = `<span><i style="color:#FF9637"></i><span style="color:var(--dim)">you</span></span><span><i style="color:#FFB454"></i><span style="color:var(--dim)">strongest</span></span><span><i style="color:#6EAAFF"></i><span style="color:var(--dim)">lighter</span></span><span><i style="color:#BCD4FF"></i><span style="color:var(--dim)">the specifics</span></span>`;
 
   const pop=$("nodePop");
   const nodeAt=(mx,my)=>{ const wx=S2Wx(mx),wy=S2Wy(my); for (let i=nodes.length-1;i>=0;i--) if (Math.hypot(wx-nodes[i].x,wy-nodes[i].y)<=nodes[i].r+8/cam.k) return i; return -1; };
   const rel=(e)=>{ const r=canvas.getBoundingClientRect(); return [e.clientX-r.left, e.clientY-r.top]; };
-  function showPop(n) { const p=nodes[n].t;
-    pop.innerHTML=`<div class="npt">${esc(p.topic)}</div><div class="npm">${esc(p.category)} · ${esc(p.dominant_intent)} · weight ${p.weight.toFixed(2)} · ${p.signals}×</div>${(p.entities||[]).length?`<div class="npe">${esc(p.entities.slice(0,4).join(", "))}</div>`:""}`;
-    pop.style.left=Math.min(W2Sx(nodes[n].x)+14,w-250)+"px"; pop.style.top=(W2Sy(nodes[n].y)+14)+"px"; pop.classList.add("show"); }
+  function showPop(n) { const nd=nodes[n];
+    if (nd.kind==="topic") { const p=nd.t;
+      pop.innerHTML=`<div class="npt">${esc(p.topic)}</div><div class="npm">${esc(p.category)} · ${esc(p.dominant_intent)} · weight ${p.weight.toFixed(2)} · ${p.signals}×</div>${(p.entities||[]).length?`<div class="npe">${esc(p.entities.slice(0,4).join(", "))}</div>`:""}`;
+    } else if (nd.kind==="entity") { pop.innerHTML=`<div class="npt">${esc(nd.label)}</div><div class="npm">a specific within ${esc((nodes[nd.parent].t||{}).topic||"this interest")}</div>`;
+    } else { pop.innerHTML=`<div class="npt">you</div><div class="npm">${interests.length} interests · ${leaves.length} specifics, sized by strength</div>`; }
+    pop.style.left=Math.min(W2Sx(nd.x)+14,w-250)+"px"; pop.style.top=(W2Sy(nd.y)+14)+"px"; pop.classList.add("show"); }
 
   // Pointer events unify mouse + touch + pen; a second pointer drives pinch-zoom, a tap inspects.
   const pts=new Map();
@@ -645,6 +742,7 @@ async function loadAll() {
   renderReads(reads, total);
   renderEngage(activity);
   renderReflections(assertions);
+  setCardData(profile, topics, voice, stats);
   saveSnapshot(topics);
 }
 
@@ -666,6 +764,146 @@ setInterval(async () => {
   if (voice) renderVoice(voice); // live: voice signals captured mid-session show up without a reload
   if (activity) renderEngage(activity);
 }, 25000);
+
+/* ── shareable portrait card (drawn locally on a canvas; nothing uploaded) ── */
+let CARD = null;
+const CARD_W = 1080, CARD_H = 1350;
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function wrapLines(ctx, text, maxW) {
+  const out = []; let line = "";
+  for (const word of String(text).split(/\s+/)) {
+    const test = line ? line + " " + word : word;
+    if (ctx.measureText(test).width > maxW && line) { out.push(line); line = word; } else line = test;
+  }
+  if (line) out.push(line); return out;
+}
+function condenseVoice(voice) {
+  if (!voice || !voice.items) return [];
+  const picks = voice.items.filter((it) => ["voice","format","emphasis"].includes(it.dimension))
+    .sort((a,b) => (b.confidence||0) - (a.confidence||0))
+    .map((it) => it.pattern.split("—")[0].split(";")[0].split("(")[0].trim());
+  return [...new Set(picks)].slice(0, 4);
+}
+function setCardData(profile, topics, voice, stats) {
+  const s = stats || {};
+  CARD = {
+    headline: (profile && profile.headline) || "A portrait in progress.",
+    interests: (topics||[]).slice(0,6).map((t) => ({ label: t.topic, color: catColor(t.category) })),
+    voice: condenseVoice(voice),
+    signals: s.total || 0,
+    days: s.first ? Math.max(1, Math.round((new Date(s.last||Date.now()) - new Date(s.first)) / 86400000)) : 0,
+  };
+}
+function buildCard(canvas, opts) {
+  const c = CARD || { headline:"", interests:[], voice:[], signals:0, days:0 };
+  const dpr = 2, W = CARD_W, H = CARD_H, PAD = 84;
+  canvas.width = W*dpr; canvas.height = H*dpr; canvas.style.aspectRatio = (W/H).toFixed(4);
+  const ctx = canvas.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  ctx.fillStyle = "#0B0C0E"; ctx.fillRect(0,0,W,H);
+  // ambient glows tinted by the user's own interest colors — on-brand, "looks good on camera"
+  const cols = c.interests.map((i) => i.color);
+  [[W*0.20,H*0.15,cols[0]||"#5EC8FF"],[W*0.86,H*0.30,cols[1]||"#FFB454"],[W*0.5,H*0.95,cols[2]||"#B388FF"]]
+    .forEach(([x,y,col]) => { const g=ctx.createRadialGradient(x,y,0,x,y,W*0.55); g.addColorStop(0,col+"26"); g.addColorStop(1,col+"00"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); });
+  ctx.strokeStyle = "rgba(255,255,255,0.10)"; ctx.lineWidth = 2; rrect(ctx,28,28,W-56,H-56,20); ctx.stroke();
+
+  let y = PAD + 6;
+  ctx.fillStyle = "#F1F2F4"; ctx.font = "600 30px "+FONT; ctx.fillText("persnally", PAD, y);
+  ctx.fillStyle = "#35D07F"; ctx.beginPath(); ctx.arc(PAD + ctx.measureText("persnally").width + 15, y-9, 5, 0, Math.PI*2); ctx.fill();
+  ctx.textAlign = "right"; ctx.fillStyle = "#9A9DA5"; ctx.font = "500 22px "+FONT; ctx.fillText("a portrait of me", W-PAD, y); ctx.textAlign = "left";
+  y += 50;
+
+  if (opts.head && c.headline) {
+    let fs = 54, lines;
+    do { ctx.font = "700 "+fs+"px "+FONT; lines = wrapLines(ctx, c.headline, W-PAD*2); fs -= 3; } while (lines.length > 4 && fs > 30);
+    fs += 3; ctx.font = "700 "+fs+"px "+FONT; ctx.fillStyle = "#FFFFFF";
+    const lh = fs*1.18;
+    for (const ln of lines.slice(0,4)) { y += lh; ctx.fillText(ln, PAD, y); }
+    y += 24;
+  }
+
+  if (opts.int && c.interests.length) {
+    y += 30; ctx.fillStyle = "#9A9DA5"; ctx.font = "600 19px "+FONT; ctx.fillText("WHAT I'M INTO", PAD, y); y += 36;
+    let x = PAD; const ch = 52, gap = 13; ctx.font = "600 24px "+FONT;
+    for (const it of c.interests) {
+      const cw = ctx.measureText(it.label).width + 50;
+      if (x + cw > W-PAD) { x = PAD; y += ch + gap; }
+      ctx.fillStyle = it.color+"22"; ctx.strokeStyle = it.color+"99"; ctx.lineWidth = 1.5; rrect(ctx,x,y,cw,ch,ch/2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = it.color; ctx.beginPath(); ctx.arc(x+22, y+ch/2, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = "#F1F2F4"; ctx.fillText(it.label, x+38, y+ch/2+8);
+      x += cw + gap;
+    }
+    y += ch + 26;
+  }
+
+  if (opts.voice && c.voice.length) {
+    y += 24; ctx.fillStyle = "#9A9DA5"; ctx.font = "600 19px "+FONT; ctx.fillText("HOW I WRITE", PAD, y); y += 38;
+    ctx.fillStyle = "#C7CACF"; ctx.font = "400 26px "+FONT;
+    for (const ln of wrapLines(ctx, c.voice.join("   ·   "), W-PAD*2).slice(0,2)) { ctx.fillText(ln, PAD, y); y += 38; }
+  }
+
+  // constellation — the brand's signature visual, drawn from the same interest colors;
+  // fills the lower band so the card reads full in every toggle state.
+  if (c.interests.length >= 2) {
+    const bandTop = y + 30, bandBottom = H - PAD - 104;
+    if (bandBottom - bandTop > 130) {
+      const cxb = W/2, cyb = (bandTop + bandBottom) / 2;
+      const spread = Math.min(W - PAD*2, bandBottom - bandTop) * 0.46;
+      const ns = c.interests.map((it, i) => {
+        const a = i * 2.39996323, rad = spread * Math.sqrt((i + 0.5) / c.interests.length);
+        return { x: cxb + Math.cos(a)*rad, y: cyb + Math.sin(a)*rad*0.62, r: 30 - i*3.2, color: it.color };
+      });
+      for (let i = 0; i < ns.length; i++) for (let j = i+1; j < ns.length; j++) {
+        const A = ns[i], B = ns[j], d = Math.hypot(A.x-B.x, A.y-B.y);
+        if (d > spread*1.05) continue;
+        const g = ctx.createLinearGradient(A.x,A.y,B.x,B.y); g.addColorStop(0,A.color+"40"); g.addColorStop(1,B.color+"40");
+        const off = d*0.14, mx = (A.x+B.x)/2 + (-(B.y-A.y)/d)*off, my = (A.y+B.y)/2 + ((B.x-A.x)/d)*off;
+        ctx.strokeStyle = g; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.quadraticCurveTo(mx,my,B.x,B.y); ctx.stroke();
+      }
+      for (const n of ns) {
+        const halo = ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,n.r*2.8);
+        halo.addColorStop(0,n.color+"cc"); halo.addColorStop(0.45,n.color+"33"); halo.addColorStop(1,n.color+"00");
+        ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(n.x,n.y,n.r*2.8,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = n.color; ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.beginPath(); ctx.arc(n.x-n.r*0.3, n.y-n.r*0.3, n.r*0.28, 0, Math.PI*2); ctx.fill();
+      }
+    }
+  }
+
+  if (opts.stats) {
+    const parts = [];
+    if (c.signals) parts.push(fmtN(c.signals)+" signals");
+    if (c.days) parts.push(fmtN(c.days)+" days");
+    parts.push("100% on my machine");
+    ctx.fillStyle = "#62656D"; ctx.font = "500 22px "+FONT; ctx.fillText(parts.join("   ·   "), PAD, H-PAD-58);
+  }
+  ctx.fillStyle = "#9A9DA5"; ctx.font = "500 22px "+FONT; ctx.fillText("made with persnally — your own context engine", PAD, H-PAD);
+  ctx.textAlign = "right"; ctx.fillStyle = "#62656D"; ctx.fillText("persnally.com", W-PAD, H-PAD); ctx.textAlign = "left";
+}
+const _modal = $("shareModal");
+function renderCard() { buildCard($("cardCanvas"), { head:$("tHead").checked, int:$("tInt").checked, voice:$("tVoice").checked, stats:$("tStats").checked }); }
+function openShare() { renderCard(); _modal.classList.add("open"); _modal.setAttribute("aria-hidden","false"); }
+function closeShare() { _modal.classList.remove("open"); _modal.setAttribute("aria-hidden","true"); }
+$("shareBtn").onclick = openShare;
+$("shareClose").onclick = closeShare;
+_modal.addEventListener("click", (e) => { if (e.target === _modal) closeShare(); });
+["tHead","tInt","tVoice","tStats"].forEach((id) => $(id).addEventListener("change", renderCard));
+addEventListener("keydown", (e) => { if (e.key === "Escape" && _modal.classList.contains("open")) closeShare(); });
+$("cardDownload").onclick = () => $("cardCanvas").toBlob((b) => {
+  if (!b) return; const u = URL.createObjectURL(b), a = document.createElement("a");
+  a.href = u; a.download = "persnally-portrait.png"; a.click(); setTimeout(() => URL.revokeObjectURL(u), 1000);
+}, "image/png");
+$("cardCopy").onclick = async () => {
+  const btn = $("cardCopy");
+  try {
+    const b = await new Promise((r) => $("cardCanvas").toBlob(r, "image/png"));
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": b })]);
+    btn.textContent = "Copied ✓"; setTimeout(() => btn.textContent = "Copy image", 1600);
+  } catch { btn.textContent = "Copy unsupported — Download"; setTimeout(() => btn.textContent = "Copy image", 2400); }
+};
 
 loadAll();
 

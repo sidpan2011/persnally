@@ -2,6 +2,15 @@
 
 All notable changes to Persnally will be documented in this file.
 
+## [2.6.0] - 2026-06-27
+
+### Added
+- **Shareable portrait card** — a "Share portrait" button on the dashboard generates a downloadable image of your self-portrait (archetype, top interests, voice, stats) with a mini interest-constellation. Rendered locally; you choose what's shown; nothing is uploaded.
+- Plain-language intro line on the dashboard hero so first-time viewers immediately understand what they're looking at.
+
+### Changed
+- **Interest map redesigned** into a radial "you at the center" portrait — your interests radiate by strength in a curated amber palette, their entities branch off as leaf nodes; refined nodes (soft inner-light, no glossy bead), restrained glow, a deeper backdrop, and a subtle ambient drift. Category detail moved to the hover card + list view.
+
 ## [2.5.3] - 2026-06-25
 
 ### Added
