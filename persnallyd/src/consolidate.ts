@@ -9,7 +9,7 @@
 import { z } from "zod";
 import { loadConfig, saveConfig } from "./config.js";
 import { newEvent, PAYLOAD_SCHEMAS, type PersnallyEvent } from "./events.js";
-import type { ChosenExtractor } from "./llm.js";
+import { chooseExtractor, type ChosenExtractor } from "./llm.js";
 import { synthesizeProfile } from "./profile.js";
 import type { EventStore } from "./store.js";
 
@@ -86,9 +86,12 @@ export async function runConsolidation(
     }
   }
 
+  // The profile is the centerpiece artifact — always synthesize it with the
+  // profile model, not the cheaper assertions engine passed in as `engine`.
   let profileRefreshed = false;
   if (engine && newSignals.length >= PROFILE_MIN_SIGNALS) {
-    await synthesizeProfile(store, engine.extract, engine.model);
+    const profileEngine = await chooseExtractor("profile");
+    await synthesizeProfile(store, profileEngine.extract, profileEngine.model);
     profileRefreshed = true;
   }
 

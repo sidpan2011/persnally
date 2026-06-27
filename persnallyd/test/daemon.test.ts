@@ -17,6 +17,8 @@ const postJson = (path: string, body: unknown, headers: Record<string, string> =
     body: JSON.stringify(body),
   });
 const dir = mkdtempSync(join(tmpdir(), "daemon-test-"));
+process.env.PERSNALLY_DIR = dir;       // isolate config writes (POST /engine/key) to the temp dir
+delete process.env.ANTHROPIC_API_KEY;  // clean baseline for the engine-status / key tests
 const store = new EventStore(join(dir, "test.db"));
 let server: ReturnType<typeof startDaemon>;
 
@@ -104,6 +106,35 @@ test("POST /events without JSON content type is rejected (CSRF preflight bypass)
     method: "POST",
     headers: { "Content-Type": "text/plain" },
     body: JSON.stringify({ type: "signal.topic" }),
+  });
+  assert.equal(r.status, 415);
+});
+
+test("GET /engine reports engine status shape", async () => {
+  const e = await (await fetch(BASE + "/engine")).json() as {
+    hasKey: boolean; ollama: { reachable: boolean; models: string[] }; recommended: string; pull: { state: string };
+  };
+  assert.equal(typeof e.hasKey, "boolean");
+  assert.equal(typeof e.ollama.reachable, "boolean");
+  assert.ok(Array.isArray(e.ollama.models));
+  assert.equal(typeof e.recommended, "string");
+  assert.equal(e.pull.state, "idle");
+});
+
+test("POST /engine/key rejects non-Anthropic keys, accepts + masks a valid one, applies it live", async () => {
+  assert.equal((await postJson("/engine/key", { key: "nope" })).status, 400);
+  const r = await postJson("/engine/key", { key: "sk-ant-test0123456789abcdef" });
+  assert.equal(r.status, 200);
+  const body = await r.json() as { ok: boolean; keyMasked: string };
+  assert.equal(body.ok, true);
+  assert.ok(body.keyMasked.startsWith("sk-ant-test0") && body.keyMasked.endsWith("cdef") && body.keyMasked.includes("…"));
+  const e = await (await fetch(BASE + "/engine")).json() as { hasKey: boolean }; // applied live, no restart
+  assert.equal(e.hasKey, true);
+});
+
+test("POST /engine/key without JSON content type is rejected", async () => {
+  const r = await fetch(BASE + "/engine/key", {
+    method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ key: "sk-ant-x" }),
   });
   assert.equal(r.status, 415);
 });

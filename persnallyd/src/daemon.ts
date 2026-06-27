@@ -5,12 +5,12 @@
 
 import http from "node:http";
 import { readFileSync } from "node:fs";
-import { loadConfig } from "./config.js";
+import { loadConfig, saveConfig } from "./config.js";
 import { runConsolidation, shouldRunNow } from "./consolidate.js";
 import { allowedCategories, loadScopes, type Category } from "./permissions.js";
 import { newEvent, validateEvent, type EventType, type PersnallyEvent, type Provenance } from "./events.js";
 import { importNewClaudeCodeSessions } from "./importers/claude-code.js";
-import { chooseExtractor } from "./llm.js";
+import { chooseExtractor, ollamaTags, pullOllamaModel, RECOMMENDED_LOCAL_MODEL } from "./llm.js";
 import { synthesizeProfile } from "./profile.js";
 import type { EventStore } from "./store.js";
 
@@ -21,6 +21,10 @@ const MAX_QUERY_LIMIT = 10_000;          // ceiling for public ?limit= params
 // Single source of truth for the user-visible version: package.json.
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf-8")) as { version: string };
 export const VERSION: string = pkg.version;
+
+// In-flight local-model download — module state so progress survives across poll requests.
+type PullState = { state: "idle" | "pulling" | "done" | "error"; model: string; percent: number; status: string; error: string };
+let pull: PullState = { state: "idle", model: "", percent: 0, status: "", error: "" };
 
 export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server {
   const localHosts = [`127.0.0.1:${port}`, `localhost:${port}`];
@@ -85,6 +89,50 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
       if (req.method === "POST" && url.pathname === "/consolidate") {
         const engine = await chooseExtractor("extract").catch(() => null);
         return json(res, 200, await runConsolidation(store, engine));
+      }
+      // Engine onboarding: status + live key-save + one-click local-model pull.
+      if (req.method === "GET" && url.pathname === "/engine") {
+        const tags = await ollamaTags();
+        const cfgKey = loadConfig().anthropic_api_key;
+        const key = process.env.ANTHROPIC_API_KEY || (typeof cfgKey === "string" ? cfgKey : "");
+        return json(res, 200, {
+          hasKey: key.startsWith("sk-ant-"),
+          keyMasked: key ? `${key.slice(0, 12)}…${key.slice(-4)}` : "",
+          hasProfile: !!store.getProfile(),
+          ollama: { reachable: tags !== null, models: tags ?? [], hasModel: (tags?.length ?? 0) > 0 },
+          recommended: RECOMMENDED_LOCAL_MODEL,
+          pull,
+        });
+      }
+      if (req.method === "POST" && url.pathname === "/engine/key") {
+        if (!(req.headers["content-type"] ?? "").includes("application/json")) {
+          return json(res, 415, { error: "Content-Type must be application/json" });
+        }
+        const body = (await readBody(req)) as { key?: unknown };
+        const key = typeof body.key === "string" ? body.key.trim() : "";
+        if (!key.startsWith("sk-ant-")) return json(res, 400, { error: "expected an Anthropic key (sk-ant-…)" });
+        saveConfig({ anthropic_api_key: key });
+        process.env.ANTHROPIC_API_KEY = key; // apply to the running daemon — no restart needed
+        return json(res, 200, { ok: true, keyMasked: `${key.slice(0, 12)}…${key.slice(-4)}` });
+      }
+      if (req.method === "POST" && url.pathname === "/engine/pull") {
+        if (!(req.headers["content-type"] ?? "").includes("application/json")) {
+          return json(res, 415, { error: "Content-Type must be application/json" });
+        }
+        if (pull.state === "pulling") return json(res, 200, { started: false, ...pull });
+        const body = (await readBody(req).catch(() => ({}))) as { model?: unknown };
+        const model = typeof body.model === "string" && body.model ? body.model : RECOMMENDED_LOCAL_MODEL;
+        if ((await ollamaTags()) === null) {
+          return json(res, 400, { error: "Ollama isn't running. Install it from ollama.com, then try again." });
+        }
+        pull = { state: "pulling", model, percent: 0, status: "starting", error: "" };
+        pullOllamaModel(model, (p) => { pull.percent = p.percent; pull.status = p.status; })
+          .then(() => { pull = { ...pull, state: "done", percent: 100, status: "ready" }; })
+          .catch((e) => { pull = { ...pull, state: "error", error: e instanceof Error ? e.message : String(e) }; });
+        return json(res, 200, { started: true, model });
+      }
+      if (req.method === "GET" && url.pathname === "/engine/pull") {
+        return json(res, 200, pull);
       }
       if (req.method === "GET" && url.pathname === "/events") {
         const ids = url.searchParams.get("ids");
