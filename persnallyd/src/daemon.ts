@@ -12,6 +12,7 @@ import { newEvent, validateEvent, type EventType, type PersnallyEvent, type Prov
 import { importNewClaudeCodeSessions } from "./importers/claude-code.js";
 import { chooseExtractor, ollamaTags, pullOllamaModel, RECOMMENDED_LOCAL_MODEL } from "./llm.js";
 import { synthesizeProfile } from "./profile.js";
+import { refreshVoice } from "./voice.js";
 import type { EventStore } from "./store.js";
 
 export const DEFAULT_PORT = 4983;
@@ -84,11 +85,15 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
       }
       if (req.method === "POST" && url.pathname === "/synthesize") {
         const engine = await chooseExtractor("profile");
-        return json(res, 200, await synthesizeProfile(store, engine.extract, engine.model));
+        const profile = await synthesizeProfile(store, engine.extract, engine.model);
+        safeRefreshVoice(store, "dashboard"); // keep "how you write" current with the portrait
+        return json(res, 200, profile);
       }
       if (req.method === "POST" && url.pathname === "/consolidate") {
         const engine = await chooseExtractor("extract").catch(() => null);
-        return json(res, 200, await runConsolidation(store, engine));
+        const result = await runConsolidation(store, engine);
+        safeRefreshVoice(store, "dashboard");
+        return json(res, 200, result);
       }
       // Engine onboarding: status + live key-save + one-click local-model pull.
       if (req.method === "GET" && url.pathname === "/engine") {
@@ -197,6 +202,7 @@ export function startDaemon(store: EventStore, port = DEFAULT_PORT): http.Server
     try {
       const engine = await chooseExtractor("extract").catch(() => null);
       const r = await runConsolidation(store, engine);
+      safeRefreshVoice(store, "cli"); // nightly: keep the voice fingerprint fresh + clean
       console.error(`consolidation: ${r.newSignals} new signals, ${r.assertions} assertions, profile ${r.profileRefreshed ? "refreshed" : "kept"}, ${r.stylePruned} style signals pruned`);
     } catch (e) {
       console.error("consolidation failed:", e instanceof Error ? e.message : e);
@@ -232,6 +238,16 @@ let cachedHtml: string | undefined;
 function dashboardHtml(): string {
   cachedHtml ??= readFileSync(new URL("./dashboard.html", import.meta.url), "utf-8");
   return cachedHtml;
+}
+
+// Re-derive the voice fingerprint alongside synthesize/reflect so "how you write"
+// stays current and clean. Deterministic + offline; must never break the caller.
+function safeRefreshVoice(store: EventStore, surface: "cli" | "dashboard"): void {
+  try {
+    refreshVoice(store, undefined, surface);
+  } catch (e) {
+    console.error("voice refresh failed:", e instanceof Error ? e.message : e);
+  }
 }
 
 function json(res: http.ServerResponse, status: number, body: unknown): void {

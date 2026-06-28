@@ -853,7 +853,9 @@ function wrapLines(ctx, text, maxW) {
 }
 function condenseVoice(voice) {
   if (!voice || !voice.items) return [];
-  const picks = voice.items.filter((it) => ["voice","format","emphasis"].includes(it.dimension))
+  // "HOW I WRITE" is writing style — tone + format only. Recurring phrases (emphasis)
+  // are vocabulary, not style, and are noise-prone (pasted errors, tool output).
+  const picks = voice.items.filter((it) => ["voice","format"].includes(it.dimension))
     .sort((a,b) => (b.confidence||0) - (a.confidence||0))
     .map((it) => it.pattern.split("—")[0].split(";")[0].split("(")[0].trim());
   return [...new Set(picks)].slice(0, 4);

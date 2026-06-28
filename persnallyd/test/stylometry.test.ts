@@ -23,6 +23,24 @@ test("proseLines keeps sentences, drops json/paths/single-word lines", () => {
   assert.deepEqual(lines, ["can you fix this bug"]);
 });
 
+test("proseLines drops machine/agent noise (rate-limit notices, tool output)", () => {
+  const lines = proseLines(
+    "lets ship the launch today\n" +
+    "failed you've hit your usage limit\nyour session limit resets at 2am Asia/Calcutta\ncompleted exit code 0",
+  );
+  assert.deepEqual(lines, ["lets ship the launch today"]);
+});
+
+test("analyzeVoice never surfaces machine noise as a recurring phrase", () => {
+  // 20 prompts each carrying the rate-limit/exit-code lines: high frequency, but not the user's voice.
+  const msgs = Array.from({ length: 20 }, () =>
+    proseLines("review the diff carefully before merging\ncompleted exit code 0\nyour session limit resets").join("\n"),
+  );
+  const v = analyzeVoice(msgs);
+  const phrases = v.signals.filter((s) => s.dimension === "emphasis").map((s) => s.pattern).join(" | ");
+  assert.doesNotMatch(phrases, /exit code|session limit|resets/);
+});
+
 test("analyzeVoice surfaces a repeated phrase + terse tone and builds a valid pack", () => {
   const msgs = Array.from({ length: 20 }, () => "be 100% sure about the analysis. fix it now.");
   const v = analyzeVoice(msgs);

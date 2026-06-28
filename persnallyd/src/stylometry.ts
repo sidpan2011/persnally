@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 import { PAYLOAD_SCHEMAS } from "./events.js";
+import { MACHINE_LINE } from "./prose.js";
 
 export type StyleSignal = z.infer<(typeof PAYLOAD_SCHEMAS)["signal.style"]>;
 
@@ -79,7 +80,7 @@ export function analyzeVoice(messages: string[]): VoiceProfile {
   const phrases: { phrase: string; count: number }[] = [];
   const keptTokens: Set<string>[] = [];
   for (const [g, c] of [...quad.entries(), ...tri.entries()]
-    .filter(([g, c]) => c >= minP && !allStop(g))
+    .filter(([g, c]) => c >= minP && !allStop(g) && !MACHINE_LINE.test(g))
     .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)) {
     const gt = g.split(" ");
     if (keptTokens.some((k) => gt.filter((w) => k.has(w)).length >= 2)) continue; // same phrase, different window

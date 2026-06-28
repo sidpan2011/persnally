@@ -27,8 +27,7 @@ import {
   removePidFile, runningPid, startDetached, stopDaemon, writePidFile,
 } from "./lifecycle.js";
 import { newEvent } from "./events.js";
-import { proseLines } from "./prose.js";
-import { analyzeVoice } from "./stylometry.js";
+import { refreshVoice } from "./voice.js";
 import { renderProfile, synthesizeProfile } from "./profile.js";
 import { DEFAULT_DB_PATH, EventStore } from "./store.js";
 
@@ -340,15 +339,11 @@ async function main(): Promise<void> {
     case "voice": {
       // Deterministic, offline, re-runnable — refreshes the stylometry layer in place.
       const dir = args[0] || DEFAULT_TRANSCRIPTS_DIR;
-      const { parsed } = parseClaudeCodeTranscripts(dir);
-      const corpus = parsed.conversations.flatMap((c) => proseLines(c.userMessages.join("\n")));
-      const v = analyzeVoice(corpus);
-      if (!v.signals.length) return die(`Not enough prose in ${dir} to fingerprint a voice yet.`);
       const store = new EventStore();
-      store.clearStyleByBasis("stylometry"); // replace, don't accumulate, across re-runs
-      store.append(v.signals.map((s) => newEvent("signal.style", "cli", s, { kind: "local", surface: "cli" })));
+      const r = refreshVoice(store, dir, "cli");
       store.close();
-      console.log(`Voice fingerprint refreshed from ${v.prompts} prompts.\n\n${v.pack}`);
+      if (!r.signals) return die(`Not enough prose in ${dir} to fingerprint a voice yet.`);
+      console.log(`Voice fingerprint refreshed from ${r.prompts} prompts.\n\n${r.pack}`);
       return;
     }
     case "show": {
